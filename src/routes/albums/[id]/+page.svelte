@@ -4,6 +4,7 @@
 	import {
 		ArrowUp,
 		Check,
+		Download,
 		Heart,
 		Layers,
 		ListChecks,
@@ -163,6 +164,14 @@
 					title="Review"
 				>
 					<ListChecks class="size-4" />
+				</a>
+				<a
+					href={resolve('/albums/[id]/download', { id: String(data.album.id) })}
+					class="btn btn-ghost btn-sm"
+					aria-label="Download"
+					title="Download"
+				>
+					<Download class="size-4" />
 				</a>
 			{/if}
 			{#if data.album.decisionMode === DecisionMode.Together}
