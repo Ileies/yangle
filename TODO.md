@@ -1,103 +1,37 @@
 # Yangle — TODO / Project Plan
 
-Mobile-first, swipe-based photo triage app. Upload an album, swipe through photos like
-vocabulary flashcards (delete / keep / favorite), share albums with someone else (e.g.
-solo-decide or decide-together), then download the surviving set as a ZIP. Named after Yang
-(my girlfriend) + "angle"/"untangle" — also a nod to the yin-yang duality that the core swipe
-decision (keep vs. delete) mirrors, which we lean into visually (see Design language below).
+See `README.md` for what this app is, the stack, the data model, and setup — this file tracks
+section-by-section build status, what's left, and the reasoning behind non-obvious decisions
+(so gaps read as deliberate deferrals, not oversights). See `CLAUDE.md` for operational
+gotchas when working in this repo.
 
-No i18n — English only. SQLite is a local file (`local.db`, no Turso/hosted DB). Uploaded
-photos live on local disk (no S3), served by the app itself.
+Legend: `[x]` done, `[ ]` not started/not finished yet.
 
-Legend: `[x]` done in this session's scaffold, `[ ]` not started yet.
+## Remaining work (quick scan)
+
+- [ ] PWA manifest (§0)
+- [ ] HEIC real-device decode-performance test, and a download UI that distinguishes
+      "original (HEIC)" vs. "compatible (JPEG)" instead of silently picking one (§2)
+- [ ] Swipe deck: real-device orientation test matrix (§3.3) and performance targets + full
+      device test matrix (§3.9) — both need actual phones, not curl/devtools
+- [ ] Sharing: `live` resolveMode for `together`-mode albums — Phase 2+, needs SSE infra (§5)
+- [ ] Design language: evaluate echoing the yin-yang curve behind the swipe deck's own
+      keep/delete zone indicators (optional, low priority)
+
+Everything else below is done and verified live against a running dev server (not just
+type-checked/linted — see each section's "verified"/"implementation notes" for specifics).
 
 ---
 
-## 0. Foundation / scaffold (this session)
+## 0. Foundation / scaffold
 
-- [x] SvelteKit 2 + Svelte 5 (runes) + Bun, scaffolded via `sv create`
-- [x] Tailwind 4 + DaisyUI 5 (`light`/`dark`, follows `prefers-color-scheme`)
-- [x] `@sveltejs/adapter-node` (self-hosted, matches "local disk storage" requirement)
-- [x] Drizzle ORM, SQLite dialect
-  - Runtime driver: `drizzle-orm/bun-sqlite` (native to Bun, zero extra native deps)
-  - `drizzle-kit` CLI driver: `@libsql/client` (dev-only; `better-sqlite3` fails to build on
-    NixOS without extra toolchain — see Nix note below)
-- [x] Initial migration generated & applied (`drizzle/0000_*.sql` → `local.db`, 11 tables)
-- [x] File structure (see below)
-- [x] `flake.nix` + `.envrc` (`use flake`) dev shell — see Nix note below
-- [x] Type-check, lint, format, and a dev-server smoke test all pass clean
+- [x] SvelteKit 2 + Svelte 5 (runes) + Bun, Tailwind 4 + DaisyUI 5, Drizzle/SQLite,
+      `@sveltejs/adapter-node`, Nix dev shell, type-check/lint/format all clean
 - [ ] PWA manifest (`static/manifest.webmanifest` + icons + `<link rel="manifest">` in
       `app.html`) — cheap to add and buys the "installed app" feel (home-screen icon, no
       browser chrome) that matters a lot for a swipe-heavy full-screen mobile UI. Not full
       offline support (there's nothing meaningful to do offline here, the app is inherently
       server-backed) — just the installability/manifest layer.
-
-### NixOS note (flag for future friction)
-
-Two native-binary npm packages hit the classic NixOS non-FHS problem:
-
-- **`sharp`** (image resizing/thumbnailing): its prebuilt binary `dlopen()`s `libstdc++.so.6`
-  at runtime, which isn't on the default library path outside FHS distros. Fixed by the
-  project's `flake.nix`, which sets `LD_LIBRARY_PATH` to include `stdenv.cc.cc.lib`. **Always
-  run this project inside the flake dev shell** (`direnv allow`, or `nix develop`) or `sharp`
-  will crash with `ERR_DLOPEN_FAILED`.
-- **`better-sqlite3`** (would've been the natural drizzle-kit CLI driver): needs to compile
-  from source via node-gyp, which isn't set up out of the box. Swapped for `@libsql/client`
-  (ships prebuilt napi bindings) — used **only** by the `drizzle-kit` CLI, not at runtime.
-
-Also: `vite dev` / `vite build` must run as `bun --bun vite dev` (see `package.json`), not
-plain `vite dev` — otherwise Vite's SSR module loader falls back to Node's ESM loader, which
-doesn't understand the `bun:sqlite` import scheme used by `drizzle-orm/bun-sqlite`.
-
-### File structure
-
-```
-src/
-  lib/
-    constants.ts        — app-wide constants (timeouts, image sizes, gesture thresholds)
-    types.ts             — shared enums/types (DecisionStatus, AlbumRole, ...)
-    utils.ts              — small pure helpers used across client+server (hashing, formatting)
-    state.svelte.ts     — app-wide shared reactive state (`$state`, one object, Svelte 5 runes)
-    server/
-      db/
-        schema.ts        — Drizzle schema (single source of truth for the data model)
-        index.ts          — `db` export (drizzle client)
-      auth.ts              — magic-link + session helpers
-      mail.ts               — sends magic-link emails (falls back to console.log in dev)
-      storage.ts            — local-disk upload storage, thumbnail/preview generation, hashing
-      albums.ts              — role/permission checks, owned+shared album queries, create
-      photos.ts               — photo CRUD, dedup-by-hash lookup, name-variant bookkeeping
-    components/          — (not yet created) Svelte components
-  routes/                — SvelteKit routes (pages + API endpoints)
-  hooks.server.ts        — reads session cookie → `event.locals.user`
-storage/                 — gitignored, local disk storage
-  originals/  previews/  thumbnails/  zips/
-drizzle/                 — generated SQL migrations
-```
-
-**Why one `state.svelte.ts` file:** mirrors the pattern from `adhd-tasker` (a sibling project) —
-a single reactive object avoids scattered stores and makes it obvious where "current user" /
-"is rotation allowed" / etc. live. If the swipe-session queue state (Phase 2) turns out to need
-its own file for size reasons, split it out explicitly rather than letting it creep in here.
-
-### Data model (implemented in `schema.ts`)
-
-| Table                                        | Purpose                                                                                           |
-| -------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| `users`                                      | keyed by email                                                                                    |
-| `magic_links`                                | one-time login tokens, 15 min TTL                                                                 |
-| `sessions`                                   | revocable server-side sessions, 30 day TTL                                                        |
-| `albums`                                     | owner, name, `decisionMode` (independent/together), `resolveMode` (live/swipe-all-then-resolve)   |
-| `album_shares`                               | who an album is shared with + role (contributor can add photos, viewer can only decide)           |
-| `photos`                                     | one row per **unique** image (dedup'd by content hash) per album                                  |
-| `photo_name_variants`                        | alternate file names seen for the same content hash                                               |
-| `decisions`                                  | **per (photo, user)** status: undecided/keep/delete/favorite — never destructive, always editable |
-| `download_batches` / `download_batch_photos` | ZIP generation jobs and their contents                                                            |
-| `photo_downloads`                            | per (photo, user) "already downloaded" mark                                                       |
-
-The core design decision: nothing is ever deleted from the DB when a user "deletes" a photo —
-`decisions` just gets a row with `status: delete`. This is what makes "undo a delete
-afterwards" and independent-vs-together sharing modes fall out of the same table for free.
 
 ---
 
@@ -110,27 +44,26 @@ afterwards" and independent-vs-together sharing modes fall out of the same table
       for local dev, no mail server needed)
 - [x] `/login` page: email input → `createMagicLink` + `sendMagicLinkEmail`. Redirects to `/`
       if already signed in; shows a "check your email" state after sending; surfaces
-      `?error=missing|invalid` from the verify route as a message above the form.
+      `?error=missing|invalid` from the verify route as a message above the form. Also accepts
+      a `redirectTo` query param (validated same-origin-path-only) so e.g. `/invite/[token]`
+      can send an unauthenticated visitor to sign in and land right back where they started.
 - [x] `/login/verify?token=...` route (`+server.ts` GET handler): `consumeMagicLink` → sets the
       `session` cookie (httpOnly, `sameSite: lax`, `secure` outside dev) → redirects to `/`.
       Bad/missing/reused token → redirects back to `/login?error=...` instead of erroring.
 - [x] Logout action — `POST /logout` (`+server.ts`): destroys the current session, clears the
       cookie, redirects to `/login`
-- [x] Rate-limit magic-link requests per email — `magic_links.createdAt` (added in migration
-      `0002`) + a `MAGIC_LINK_RESEND_COOLDOWN_MS` (1 min) check in `createMagicLink()`; returns
-      `null` when a request is already in flight, which the `/login` action turns into a 429
-      with a "please wait a minute" message instead of silently resending
+- [x] Rate-limit magic-link requests per email — `magic_links.createdAt` +
+      `MAGIC_LINK_RESEND_COOLDOWN_MS` (1 min) check in `createMagicLink()`; returns `null` when
+      a request is already in flight, which the `/login` action turns into a 429 with a
+      "please wait a minute" message instead of silently resending
 - [x] `/profile` — edit display name (form action, persists via `updateDisplayName()`), lists
-      albums owned + albums shared with you (queries `albums`/`album_shares` directly; no join
-      helpers/relations set up yet since Albums (2) isn't built - revisit with a proper
-      `db/relations.ts` once that's needed elsewhere too), "log out everywhere"
-      (`destroyAllSessions()` — deletes every `sessions` row for the email, not just the
-      current cookie)
+      albums owned + albums shared with you, "log out everywhere" (`destroyAllSessions()` —
+      deletes every `sessions` row for the email, not just the current cookie)
 
-All of the above tested end-to-end against the dev server (curl): resend cooldown returns 429
-on the 2nd request within a minute, verify token is one-time-use (reused token → redirect with
-`error=invalid`), display name change persists across requests, and "log out everywhere"
-invalidates the session immediately (subsequent `/profile` request redirects to `/login`).
+Verified end-to-end against the dev server (curl): resend cooldown returns 429 on the 2nd
+request within a minute, verify token is one-time-use (reused token → redirect with
+`error=invalid`), display name change persists across requests, "log out everywhere" invalidates
+the session immediately.
 
 ---
 
@@ -142,57 +75,46 @@ invalidates the session immediately (subsequent `/profile` request redirects to 
       so `storeUpload()` decodes it without extra setup; thumbnail/preview are always
       re-encoded to WebP already, so those were unaffected either way. For the **original**
       file (kept byte-for-byte for ZIP download, since an Apple recipient wants the real
-      HEIC): `storeUpload()` now also writes a JPEG compatibility rendition
-      (`compatOriginalPath`, quality 92) through the same sharp/libvips pipeline whenever the
-      source format is HEIC/HEIF/AVIF, so a Windows/Android recipient has something they can
-      open without the sender needing to know or care. Deliberately **not** ffmpeg: most
-      prebuilt ffmpeg binaries aren't compiled with `libheif` support at all (HEVC licensing),
-      so it's both a second native dependency to fight NixOS/FHS issues for (see Nix note
-      above) and a _less_ reliable HEIC path than the sharp/libvips we already use — no reason
-      to introduce it just to duplicate a conversion sharp already does in the same pipeline
-      call. Sharp also carries over the embedded ICC profile (iPhones shoot Display P3) when
-      converting to JPEG, avoiding washed-out colors.
+      HEIC): `storeUpload()` also writes a JPEG compatibility rendition (`compatOriginalPath`,
+      quality 92) through the same sharp/libvips pipeline whenever the source format is
+      HEIC/HEIF/AVIF, so a Windows/Android recipient has something they can open without the
+      sender needing to know or care. Deliberately **not** ffmpeg: most prebuilt ffmpeg
+      binaries aren't compiled with `libheif` support at all (HEVC licensing), so it's both a
+      second native dependency to fight NixOS/FHS issues for and a _less_ reliable HEIC path
+      than the sharp/libvips pipeline already in use. Sharp also carries over the embedded ICC
+      profile (iPhones shoot Display P3) when converting to JPEG, avoiding washed-out colors.
   - [ ] Still needs a real-device test: confirm `sharp`'s HEIC decode performs acceptably
         (it's slower than JPEG) under real upload volume, not just a one-off test image
-  - [ ] Download UI should distinguish "original (HEIC)" vs. "compatible (JPEG)" when
-        `compatOriginalPath` is set, rather than silently picking one
-
+  - [ ] Download UI (§6) should distinguish "original (HEIC)" vs. "compatible (JPEG)" when
+        `compatOriginalPath` is set, rather than silently picking one — the ZIP download
+        currently always ships the true original
 - [x] **`/` (homepage)**: no real landing page for the MVP — `+page.server.ts` just redirects
-      straight to `/albums` (logged in) or `/login` (logged out). `+page.svelte` is
-      unreachable dead weight kept only because SvelteKit requires one alongside
-      `+page.server.ts`.
-
-- [x] **`/albums`** — list albums the user owns or is shared on. Logic (`listAlbumsFor()`)
-      lives in `src/lib/server/albums.ts` so `/profile` can reuse the same owned/shared
-      lists instead of duplicating the query.
-- [x] **`/albums/new`** — create album (name only for now; decision mode defaults to
-      `independent` and is changed later from album settings once sharing (Section 5) exists)
-- [x] **Upload flow (`/albums/[id]/upload`)**:
-  - Client hashes each file (`sha256Hex()` in `$lib/utils.ts`, shared between client and
-    server so both sides compute the exact same hash) **before** upload, POSTs the hash list
-    to `/albums/[id]/upload/check`, and only sends bytes for files that endpoint doesn't
-    already know about — bandwidth-friendly for large albums re-synced from a phone
-  - Server: `storeUpload()` (already implemented) → writes original + WebP preview + WebP
-    thumbnail, computes content hash (exact dedup) and dHash (near-duplicate clustering)
-  - **Name-conflict UI**: if `/upload/check` reports a content hash already in the album
-    under a different file name, the page shows "keep `IMG_002.jpg` or `Strand.jpg`?" —
-    resolving POSTs to `/upload/resolve`, which updates `photos.displayName` and records the
-    name not kept in `photo_name_variants` so it isn't lost
-- [x] **Contributor permission check**: `canContribute(getAlbumRole(...))` in
-      `src/lib/server/albums.ts`, enforced in both upload endpoints and reused by the album
-      page to decide whether to show the "Upload" button at all
-- [x] **Photo serving (`/photos/[id]/[size]`)**: not in the original plan but needed before
-      an album page can show anything — auth-gated file streaming (thumbnail/preview/
+      straight to `/albums` (logged in) or `/login` (logged out).
+- [x] **`/albums`** — list albums the user owns or is shared on (`listAlbumsFor()` in
+      `server/albums.ts`, shared with `/profile`).
+- [x] **`/albums/new`** — create album (name only; decision mode defaults to `independent` and
+      is changed later from album settings, §5)
+- [x] **Upload flow (`/albums/[id]/upload`)**: client hashes each file (`sha256Hex()`, shared
+      between client and server so both compute the same hash) **before** upload, POSTs the
+      hash list to `/upload/check`, and only sends bytes for files that endpoint doesn't
+      already know about. Server `storeUpload()` writes original + WebP preview + WebP
+      thumbnail, computes content hash (exact dedup) and dHash (near-duplicate clustering, §3.4).
+      **Name-conflict UI**: if `/upload/check` reports a content hash already in the album under
+      a different file name, the page prompts to pick which name to keep — resolving POSTs to
+      `/upload/resolve`, which updates `photos.displayName` and records the name not kept in
+      `photo_name_variants`.
+- [x] **Contributor permission check**: `canContribute(getAlbumRole(...))` enforced in both
+      upload endpoints and reused by the album page to decide whether to show "Upload" at all.
+- [x] **Photo serving (`/photos/[id]/[size]`)**: auth-gated file streaming (thumbnail/preview/
       original/compat) that checks album membership per request, since files live outside
-      `static/` on purpose (see intro). `Cache-Control: private, max-age=31536000, immutable`
-      since a given content hash's bytes never change.
+      `static/` on purpose. `Cache-Control: private, max-age=31536000, immutable` since a given
+      content hash's bytes never change.
 
-Tested end-to-end against a running dev server: album creation; upload of two images;
-thumbnail grid rendering; re-uploading the same bytes under a new name correctly surfaced as
-a conflict (not a silent duplicate) and resolving it updated `displayName` while preserving
-the old name in `photo_name_variants`; a second, unrelated user got `404` on the album page,
-`403` on both the thumbnail endpoint and the upload endpoint — confirming permission checks
-are enforced per-request, not just hidden in the UI.
+Verified end-to-end: album creation; upload of two images; thumbnail grid rendering;
+re-uploading the same bytes under a new name correctly surfaced as a conflict (not a silent
+duplicate) and resolving it updated `displayName` while preserving the old name in
+`photo_name_variants`; a second, unrelated user got `404` on the album page, `403` on both the
+thumbnail endpoint and the upload endpoint.
 
 ---
 
@@ -222,410 +144,277 @@ The deck needs to feel instant (no server round-trip between cards), so it works
 client-side queue hydrated once from the server, not a decision-per-navigation model.
 
 - [x] `src/routes/albums/[id]/swipe/+page.server.ts` `load`: fetch the album's photos not yet
-      `duplicateResolved === false` in a pending cluster (those go through 3.4 first) and not
-      yet decided by the current user (`decisions.status === 'undecided'` or no row), ordered
-      by `uploadedAt`. Ship down `{ id, thumbnailPath-derived URL, previewPath-derived URL,
-width, height, orientation }` per photo — never the DB row shape verbatim, keep the
-      wire payload lean since this can be a few hundred photos.
-- [x] `src/lib/swipeDeck.svelte.ts` (new, session-scoped — **not** the same file as the
-      app-wide `state.svelte.ts`, this state only exists while the deck is mounted):
-  ```ts
-  type DeckState = {
-  	queue: DeckPhoto[]; // remaining, in order
-  	index: number; // always 0 in practice — swiped cards are spliced out, not
-  	// hidden — keeps `queue[0]` = current card an invariant everywhere else reads
-  	history: { photo: DeckPhoto; previousStatus: DecisionStatus; nextStatus: DecisionStatus }[];
-  	// ^ bounded (last 20) undo stack, see 3.6
-  };
-  ```
+      `duplicateResolved === false` in a pending cluster (those go through §3.4 first) and not
+      yet decided by the current user, ordered by `uploadedAt`. Ships down a lean payload
+      (`DeckPhoto` in `types.ts`) — never the DB row shape verbatim.
+- [x] `src/lib/swipeDeck.svelte.ts` — session-scoped state: `queue` (remaining, in order, with
+      `queue[0]` always the current card — swiped cards are spliced out, not hidden), `history`
+      (bounded 20-entry undo stack, §3.6).
 - [x] A decision is optimistic: splice the card out of `queue`, push to `history`, animate the
       exit, **then** fire `POST /albums/[id]/decisions` (fire-and-forget with retry-on-failure,
-      not awaited before advancing — the UI must never block on network for the core loop). If
-      the request ultimately fails after retries, surface a small non-blocking toast ("couldn't
-      save 3 decisions, retrying...") rather than rolling back the card into the deck — losing
-      your place in a 200-photo album because of a flaky network is worse than a rare missed
-      write that a background retry will fix.
-- [x] `POST /albums/[id]/decisions` accepts a **batch** (`{ photoId, status }[]`), not one
-      call per swipe — the client coalesces rapid swipes (every ~400ms or every 5 decisions,
-      whichever first) into one request. This matters a lot on the China-latency path: one
-      round trip per swipe would make the deck feel laggy even though the UI itself never
-      waits on it.
+      not awaited before advancing). A failure after retries surfaces a small non-blocking toast
+      rather than rolling the card back into the deck.
+- [x] `POST /albums/[id]/decisions` accepts a **batch** (`{ photoId, status }[]`) — the client
+      coalesces rapid swipes (every ~400ms or every 5 decisions, whichever first) into one
+      request, so a China-latency round trip per swipe doesn't make the deck feel laggy.
 - [x] End-of-deck state: once `queue.length === 0`, show a summary (N kept, N favorited, N
-      deleted this session) with links to `/albums/[id]/review` and `/albums/[id]` — not a
-      dead end.
-- [x] Resume behavior: since the `load` query already filters to undecided photos, closing the
-      tab mid-deck and reopening `/albums/[id]/swipe` naturally resumes where you left off —
-      no separate "session" concept needed server-side.
+      deleted this session) with links to `/albums/[id]/review` and `/albums/[id]`.
+- [x] Resume behavior: since `load` already filters to undecided photos, closing the tab
+      mid-deck and reopening naturally resumes where you left off — no separate "session"
+      concept needed server-side.
 
 ### 3.1 Component/file structure
 
 - [x] `src/routes/albums/[id]/swipe/+page.svelte` — thin: owns the `swipeDeck` state instance,
-      renders `<SwipeCard>` for `queue[0]` (+ 1-2 upcoming stacked behind it for depth, see
-      3.2), the button bar, and the progress indicator
+      renders `<SwipeCard>` for `queue[0]` (+ 1-2 upcoming stacked behind it for depth, §3.2),
+      the button bar, and the progress indicator
 - [x] `src/lib/components/SwipeCard.svelte` — one photo: image element, gesture bindings
-      (3.1.1), zoom/pan transform (3.1.2), decision-swipe exit animation
+      (§3.1.1), zoom/pan transform (§3.1.2), decision-swipe exit animation
 - [x] `src/lib/components/SwipeButtons.svelte` — delete / favorite(center) / keep, rotates
-      per 3.3, dispatches the same decision path as a gesture so keyboard/tap and swipe are
+      per §3.3, dispatches the same decision path as a gesture so keyboard/tap and swipe are
       one code path, not two
-- [x] `src/lib/components/DuplicateBracket.svelte` — 3.4, mounted instead of the deck when the
+- [x] `src/lib/components/DuplicateBracket.svelte` — §3.4, mounted instead of the deck when the
       album has unresolved clusters; hands off to the normal deck on completion
-- [x] `src/lib/prefetchQueue.ts` — the sequencing logic from 3.2, decoupled from any component
+- [x] `src/lib/prefetchQueue.ts` — the sequencing logic from §3.2, decoupled from any component
       so it's independently testable
 
 ### 3.1.1 Gesture handling: never confuse zoom and swipe
 
 - [x] Use a gesture library rather than hand-rolling touch math — `@use-gesture/vanilla`
-      behind a thin Svelte action (`use:gesture`) is the better fit of the two candidates:
-      framework-agnostic, no React coupling to strip out, and its pointer-event unification
-      already handles the mouse/touch/pen distinction correctly (useful for desktop testing
-      too, even though desktop isn't a target platform — devtools touch emulation lies often
-      enough that testing with a real trackpad/mouse as a secondary sanity check is worth
-      keeping open).
-- [x] Explicit state machine (a `type GestureMode = 'idle' | 'swiping' | 'panning' | 'pinching'`
+      behind a thin Svelte action (`use:gesture`): framework-agnostic, no React coupling to
+      strip out, its pointer-event unification already handles the mouse/touch/pen distinction
+      correctly (useful for desktop testing too, even though desktop isn't a target platform).
+- [x] Explicit state machine (`type GestureMode = 'idle' | 'swiping' | 'panning' | 'pinching'`
       plus current scale — not ad-hoc booleans), transitions:
   - `idle`, `scale === 1`, one-finger drag starts → `swiping`. Horizontal component dominant =
-    delete/keep candidate; vertical-up component dominant = favorite candidate (see 3.5).
+    delete/keep candidate; vertical-up component dominant = favorite candidate (§3.5).
     Direction is locked in on gesture start based on the first ~10px of movement, not
-    re-evaluated mid-drag — prevents a diagonal drag from feeling like it "fights" the user.
+    re-evaluated mid-drag.
   - `idle`, `scale > 1`, one-finger drag starts → `panning`, moves the image within its zoomed
-    bounds (clamped, see 3.1.2). Swipe-dismiss does **not** re-arm until `scale` returns to
-    exactly `1` (either via double-tap-out or a pinch back down) — this is the crux of "never
-    confuse zoom and swipe": the mode is gated on scale, not on gesture heuristics.
+    bounds (clamped, §3.1.2). Swipe-dismiss does **not** re-arm until `scale` returns to
+    exactly `1` — the crux of "never confuse zoom and swipe": mode is gated on scale, not on
+    gesture heuristics.
   - Two-finger touch, any state → `pinching`, always wins over whatever single-finger mode was
-    active (a mid-swipe drag that gains a second finger cancels the swipe and starts a pinch —
-    match iOS Photos exactly here, don't invent different behavior).
-  - `pinching` end → back to `idle` at whatever scale the pinch left off at (not forced back to
-    the swipe-armed `scale === 1` — if the user pinches to 1.8x and lets go, they're now
-    panning-mode until they explicitly zoom back out).
-- [x] Double-tap = quick zoom to ~2.5x centered on the tap point (not the image center — pinch
-      convention), double-tap again at any point while zoomed = zoom out to exactly 1x with the
-      same spring-back animation used for the pinch-released-past-bounds case (3.1.2), so there
-      aren't two different "return to 1x" motions in the app.
-- [x] Tune `SWIPE_DISMISS_PX`/`SWIPE_DISMISS_VELOCITY`/`ZOOM_MIN_SCALE`/`ZOOM_MAX_SCALE`
-      (already in `constants.ts`, currently placeholder guesses) against real devices — the
-      velocity threshold in particular needs a flick-vs-drag distinction: a fast short flick
-      should dismiss even if it doesn't cross `SWIPE_DISMISS_PX`, a slow drag that does cross
-      it should still dismiss. Standard "OR" gate: `distance > PX || velocity > VELOCITY`.
-- [x] Card rotates slightly (a few degrees, proportional to horizontal drag distance, clamped)
-      while being dragged — the one bit of "juice" that makes a swipe deck feel like a swipe
-      deck instead of a slideshow; skipping this is the single easiest way to make this screen
-      feel cheap.
+    active (matches iOS Photos: a mid-swipe drag that gains a second finger cancels the swipe).
+  - `pinching` end → back to `idle` at whatever scale the pinch left off at.
+- [x] Double-tap = quick zoom to ~2.5x centered on the tap point; double-tap again while zoomed
+      = zoom out to exactly 1x with the same spring-back animation as the pinch-released-past-
+      bounds case (§3.1.2), so there aren't two different "return to 1x" motions.
+- [x] `SWIPE_DISMISS_PX`/`SWIPE_DISMISS_VELOCITY`/`ZOOM_MIN_SCALE`/`ZOOM_MAX_SCALE` in
+      `constants.ts` — still placeholder-tuned values, need validation against real devices
+      (the velocity threshold needs a flick-vs-drag distinction: standard "OR" gate,
+      `distance > PX || velocity > VELOCITY`).
+- [x] Card rotates slightly (proportional to horizontal drag distance, clamped) while being
+      dragged — the one bit of "juice" that makes this feel like a swipe deck, not a slideshow.
 
 ### 3.1.2 Zoom & pan mechanics
 
-- [x] Transform model: track `{ scale, translateX, translateY }` in the card's local state,
-      applied as a single `transform: translate3d(...) scale(...)` on the image element (not
-      separate wrapper divs per transform — one transform, `will-change: transform`, GPU
-      layer). Never animate `width`/`height`/`top`/`left` — those aren't composited and will
-      visibly stutter on mid-range Android.
-- [x] Pinch anchors on the midpoint between the two touch points, not the image center —
-      standard pinch-to-zoom expectation. On pinch update, recompute `translateX/Y` so the
-      point under the fingers stays under the fingers (the actual math: convert the anchor
-      point to image-local coordinates before the scale change, then re-derive the translate
-      that keeps that same image-local point under the same screen coordinate after scaling).
-- [x] Pan is clamped to the image's actual bounds at the current scale — never let the user pan
-      the image fully off-screen into empty space. When a pinch/pan ends outside bounds
-      (rubber-banded past the edge, which should be allowed _during_ the gesture for a natural
-      feel), spring back into bounds with a short eased animation on release.
-- [x] Scale is clamped to `[ZOOM_MIN_SCALE, ZOOM_MAX_SCALE]` (currently 1–4) with the same
-      rubber-band-during-gesture, spring-back-on-release treatment at both ends.
+- [x] Transform model: `{ scale, translateX, translateY }` applied as a single
+      `transform: translate3d(...) scale(...)` on the image element (one transform,
+      `will-change: transform`, GPU layer) — never animate `width`/`height`/`top`/`left`.
+- [x] Pinch anchors on the midpoint between the two touch points; on update, recompute
+      `translateX/Y` so the point under the fingers stays under the fingers.
+- [x] Pan is clamped to the image's actual bounds at the current scale; rubber-banded past the
+      edge during the gesture is allowed, springs back on release.
+- [x] Scale clamped to `[ZOOM_MIN_SCALE, ZOOM_MAX_SCALE]` (currently 1–4) with the same
+      rubber-band/spring-back treatment at both ends.
 - [x] `touch-action: none` on the image element (not `pan-y`/`pan-x`) since the gesture library
-      owns all touch interpretation here — letting the browser's native scroll/zoom compete
-      with the custom gesture handling is a common source of "swipe feels janky on iOS
-      specifically" bugs.
+      owns all touch interpretation — avoids the browser's native scroll/zoom fighting the
+      custom gesture handling (a common "swipe feels janky on iOS specifically" bug source).
 
 ### 3.2 Lazy loading, thumbnails, and global latency
 
 **The concrete problem:** the server is in Germany. A relative in China loading full-size
-originals over a congested transpacific route will get a spinner, not a swipe deck. The fix
-is architectural, not "just add a loading spinner":
+originals over a congested transpacific route will get a spinner, not a swipe deck.
 
-- [x] **Three image sizes, already modeled**: thumbnail (~320px, grids + duplicate-resolution
-      screen), preview (~1600px, what the swipe deck actually displays and zooms into — NOT
-      the multi-megapixel original), original (only fetched once, at final ZIP download time).
-      This alone cuts the swipe-deck payload by an order of magnitude vs. serving originals.
-- [x] **Prefetch queue, not naive `<img loading="lazy">`** (`src/lib/prefetchQueue.ts`): keep
-      `PREFETCH_AHEAD_COUNT` (4) preview images ahead of the current card warmed in the browser
-      cache. Concrete algorithm, driven off `queue[0]` changing:
-  1. Cancel/deprioritize any in-flight prefetch for a photo that's no longer within the
-     current window (it fell behind because of a delete, or the window shifted).
-  2. `await` the focused card's `Image().decode()` — decode, not just `load`, since `decode()`
-     is what guarantees the browser has done the (potentially expensive) bitmap decode off
-     the main thread before you rely on the image being paint-ready.
-  3. Only after that resolves, kick off fetches for the next `PREFETCH_AHEAD_COUNT` photos not
-     already cached, as `Image()` objects with `fetchPriority: 'low'` (the focused card's own
-     load, when it happens, uses `fetchPriority: 'high'`).
-  4. Cap concurrent prefetches (e.g. 2) rather than firing all 4 at once — on a poor
-     connection, 4 simultaneous requests each proceed slower than 2 queued, and the _next_
-     card (index 1) should finish before index 4 even starts.
-  - `<link rel="prefetch">` doesn't give this control (no way to sequence/cancel/prioritize) —
-    hence the hand-rolled queue instead of relying on browser-native prefetch hints.
-- [x] **Aggressive HTTP caching**: `/photos/[id]/[size]` (already built, Section 2) responds
-      `Cache-Control: private, max-age=31536000, immutable` since content-hash-derived files
-      never change — already correct, no further work here, just confirming the swipe deck's
+- [x] **Three image sizes**: thumbnail (~320px, grids + duplicate-resolution screen), preview
+      (~1600px, what the swipe deck actually displays and zooms into), original (only fetched
+      at final ZIP download time). Cuts the swipe-deck payload by an order of magnitude vs.
+      serving originals.
+- [x] **Prefetch queue, not naive `<img loading="lazy">`** (`prefetchQueue.ts`): keeps
+      `PREFETCH_AHEAD_COUNT` (4) preview images ahead of the current card warmed in cache.
+      `await`s the focused card's `Image().decode()` first (guarantees paint-readiness before
+      relying on it), only then kicks off `fetchPriority: 'low'` fetches for the next photos
+      not already cached, capped at 2 concurrent — on a poor connection, 4 simultaneous requests
+      each proceed slower than 2 queued.
+- [x] **Aggressive HTTP caching**: `/photos/[id]/[size]` (§2) already responds
+      `Cache-Control: private, max-age=31536000, immutable`; confirmed the deck's own
       `<img>`/`Image()` usage doesn't accidentally bust it (no cache-busting query params).
 - [x] **Infra-level recommendation (not app code, flag for later)**: a CDN/reverse-proxy cache
-      in front of the origin — e.g. Cloudflare free tier — even though storage stays
-      local-disk. This is the single biggest lever for the China round-trip problem, since a
-      cache hit at a nearby PoP beats any client-side trick, but it's an infra decision outside
-      this repo's scope, not something to build now.
-- [x] Serve WebP (already the storage format) with `srcset`/`sizes` or a manual DPR check
-      before requesting, so a 1x display doesn't download 3x pixels it can't show. Practically:
-      since preview is capped at 1600px already, this mostly matters for the thumbnail grid
-      (Section 2) on high-DPR phones, less so inside the deck where the preview is already
-      sized for "one photo, full screen."
-- [x] Skeleton/blur-up placeholder while the preview loads: reuse the already-fetched
-      **thumbnail** (tiny, near-instant even on a bad connection) scaled up and blurred via CSS
-      `filter: blur(...)` as the placeholder, cross-fading to the sharp preview on decode —
-      free, since the thumbnail is already being loaded for prefetch bookkeeping anyway, no
-      need for a separate base64-inline placeholder mechanism.
-- [x] Explicit failure state per card: if a preview fails to load (timeout/network error, not
-      hypothetical on a bad China route), show a retry affordance on that card rather than a
-      broken-image icon or a deck that silently stalls waiting on a `decode()` that will never
-      resolve.
+      in front of the origin (e.g. Cloudflare free tier) — the single biggest lever for the
+      China round-trip problem, but an infra decision outside this repo's scope.
+- [x] Serve WebP with a DPR check before requesting so a 1x display doesn't download 3x pixels.
+- [x] Skeleton/blur-up placeholder: reuse the already-fetched thumbnail, scaled up and blurred
+      via CSS `filter: blur(...)`, cross-fading to the sharp preview on decode.
+- [x] Explicit failure state per card: a preview that fails to load (timeout/network error)
+      shows a retry affordance rather than a broken-image icon or a silently stalled deck.
 
 ### 3.3 Orientation: rotate only when the device genuinely did
 
 The tricky requirement: distinguish "the phone is physically tilted" from "the OS actually
 reports a new orientation" — because if the OS's rotation lock is on, tilting the phone should
-change **nothing** in the UI. This is achievable and actually simpler than it sounds:
+change **nothing** in the UI.
 
 - [x] Listen to `screen.orientation`'s `change` event (not `deviceorientation`/accelerometer
-      data, and not a `matchMedia('(orientation: landscape)')` poll). `screen.orientation`
-      only fires when the browser's layout viewport orientation _actually_ changes — which
-      inherently respects the OS-level rotation lock, since a locked screen never re-renders
-      the viewport in the first place. No manual "is rotation locked?" detection needed; this
-      event _is_ that detection.
-  - Fallback for older iOS Safari (patchy `screen.orientation` support): `matchMedia`'s
-    `change` event is a reasonable proxy there, with the same "only fires on genuine layout
-    change" property.
-  - Wrap both behind one `src/lib/orientation.svelte.ts` helper exposing a single reactive
-    `angle`/`isLandscape`, so `SwipeCard`/`SwipeButtons` don't each need feature-detection
-    branches.
+      data, and not a `matchMedia` poll) — it only fires when the layout viewport orientation
+      _actually_ changes, which inherently respects OS-level rotation lock. Fallback for older
+      iOS Safari: `matchMedia`'s `change` event, same "only fires on genuine layout change"
+      property. Wrapped in `src/lib/orientation.svelte.ts` (single reactive `angle`/
+      `isLandscape`).
 - [x] **Two distinct behaviors**, gated by a user-facing toggle (`allowLandscapeRotation` in
-      `state.svelte.ts`, already scaffolded):
-  1. **Toggle off (default)**: layout stays fixed/portrait. On a confirmed orientation
-     change, only the button _glyphs_ rotate 90° in place — camera-app style — to indicate
-     "up" without moving anything. Swipe axis and layout are untouched.
-  2. **Toggle on**: full landscape layout. Buttons re-anchor to the new physical bottom edge,
-     the photo itself rotates to display large edge-to-edge, and swipe gestures still read as
-     screen-relative left/right (so the gesture feel never changes, only the chrome around it).
-     A landscape-oriented _source photo_ (already known from `photos.orientation` at upload
-     time, Section 2) should already display large without needing device rotation at all —
-     device-rotation mode is really for **portrait photos viewed with the phone held
-     sideways**, not for making landscape photos bigger.
-- [x] Toggle placement: exposed from the swipe deck's own settings (not buried in `/profile`)
-      since it's a per-session viewing preference, not an account setting — persist it in
-      `localStorage` so it survives a reload but isn't tied to the account.
-- [ ] Test matrix (the actual acceptance criteria, not optional polish):
-  - OS rotation lock ON, physically rotate the phone, toggle OFF → zero UI change.
-  - OS rotation lock ON, physically rotate the phone, toggle ON → zero UI change (device never
-    reports a change, so neither behavior should fire — this is the case most likely to be
-    gotten wrong by a naive `deviceorientation`-based implementation, which is exactly why that
-    API was ruled out above).
+      `state.svelte.ts`):
+  1. **Toggle off (default)**: layout stays fixed/portrait; only the button _glyphs_ rotate 90°
+     in place (camera-app style) on a confirmed orientation change.
+  2. **Toggle on**: full landscape layout, buttons re-anchor to the new physical bottom edge,
+     the photo rotates to display large edge-to-edge, gestures still read screen-relative.
+- [x] Toggle placement: exposed from the swipe deck's own settings, persisted in `localStorage`
+      (per-session viewing preference, not an account setting).
+- [ ] **Test matrix** (real acceptance criteria, needs an actual iPhone and Android — support
+      differs enough between them, particularly older iOS Safari, that "works on one" isn't
+      sufficient signal):
+  - OS rotation lock ON, physically rotate, toggle OFF → zero UI change.
+  - OS rotation lock ON, physically rotate, toggle ON → zero UI change (device never reports a
+    change — the case most likely to be gotten wrong by a naive `deviceorientation`-based
+    implementation, exactly why that API was ruled out above).
   - OS rotation lock OFF, physically rotate, toggle OFF → button glyphs rotate, nothing else.
-  - OS rotation lock OFF, physically rotate, toggle ON → full landscape layout as described.
-  - Run this on both an iPhone and an Android — `screen.orientation` support/quirks differ
-    enough between them (particularly older iOS Safari, hence the `matchMedia` fallback) that
-    "works on one" isn't sufficient signal.
+  - OS rotation lock OFF, physically rotate, toggle ON → full landscape layout.
 
 ### 3.4 Near-duplicate resolution (burst shots, "20x the same photo")
 
-Plain swiping is a bad UX for 20 near-identical shots — every one of them _feels_ like a
-"keep", so you end up keeping most of the burst by accident. Instead, pre-resolve clusters
-before they ever reach the swipe deck.
+Plain swiping is a bad UX for 20 near-identical shots — every one _feels_ like a "keep", so you
+end up keeping most of the burst by accident. Instead, pre-resolve clusters before they ever
+reach the swipe deck.
 
-- [x] **Clustering**: `perceptualHash` (dHash, already computed on upload in `storage.ts`) +
-      `hammingDistance()` (already in `utils.ts`) group photos within `DUPLICATE_HAMMING_THRESHOLD`
-      (8) into a `duplicateGroupId`. Run this synchronously right after `storeUpload()` inside
-      the upload endpoint (Section 2), comparing the new photo's hash against existing
-      **unresolved-cluster** hashes in the album only (resolved singles don't need
-      re-comparison) — cheap enough at album scale (hundreds, not millions, of photos) to not
-      need a background job/queue for the MVP.
-  - Union-find (not naive pairwise grouping) if a new photo matches two previously-separate
-    clusters — merge them rather than leaving the photo ambiguously attached to one.
+- [x] **Clustering**: `perceptualHash` (dHash, computed on upload) + `hammingDistance()` group
+      photos within `DUPLICATE_HAMMING_THRESHOLD` (8) into a `duplicateGroupId`. Runs
+      synchronously right after `storeUpload()` inside the upload endpoint, comparing only
+      against existing **unresolved-cluster** hashes in the album — cheap enough at album scale
+      (hundreds, not millions, of photos) to not need a background job for the MVP. Union-find
+      (not naive pairwise grouping) merges clusters when a new photo matches two previously-
+      separate ones.
 - [x] **Bracket data structure**: a cluster of N unresolved photos becomes a single-elimination
-      bracket. Model it as a plain array-based binary tree computed client-side from the
-      cluster's photo list (no new DB table needed — the bracket's _current_ state is fully
-      derivable from which photos in the cluster still have `duplicateResolved: false`, so a
-      page reload mid-bracket just recomputes the same bracket from remaining candidates): - Odd cluster size → one random bye per round (advances automatically, no comparison
-      needed) — standard tournament-bracket handling, not a special case to hand-roll. - Round order given to the user: pair adjacent items in upload order for round 1 (burst
-      shots are usually already adjacent in upload order, so this naturally pits genuinely
-      similar-looking pairs against each other first) — random pairing for hypothetical
-      future rounds isn't necessary since brackets here are shallow (log2(20) ≈ 5 rounds max
-      for a big burst).
-- [x] **Resolution UI** (`DuplicateBracket.svelte`, 3.1): split-screen, two photos side by
-      side, a draggable divider the user drags toward the photo they want to discard (drag
-      left → left photo loses). Tap-to-pick on either half also works as a fallback/
-      accessibility path — the divider drag shouldn't be the _only_ way to resolve a pair.
-  - Winner advances (held client-side until the bracket for this cluster completes); loser is
-    marked `delete` immediately via the same decisions-write path as a normal swipe (revisable
-    later like any other decision — nothing here is more "final" than a normal swipe).
-  - When one photo remains in the cluster, it gets `duplicateResolved: true` and flows into
-    the normal swipe deck's queue alongside singleton photos — the bracket doesn't
-    auto-decide the survivor's fate, it just removes the "which of these 20" problem before
-    the real keep/delete/favorite judgment call.
-  - Progress indicator across the whole multi-cluster resolution phase ("Round 2 of 3 · burst
-    4 of 7"), since an album can have several independent bursts to get through before the
-    deck itself even opens.
-- [x] **Design language**: the divider line in this split-screen is a **gentle S-curve**
-      (a yin-yang-style sigmoid via an SVG `<path>` or `clip-path: path(...)`), not a straight
-      vertical line — see Design language below. The curve's midpoint follows the drag
-      position; the S-shape itself stays proportionally consistent as it's dragged rather than
-      degenerating into a straight line at the extremes (i.e. the control points scale with
-      the drag offset, not just the anchor points).
+      bracket, computed client-side from the cluster's photo list — no new DB table, the
+      bracket's _current_ state is fully derivable from which photos still have
+      `duplicateResolved: false`, so a page reload mid-bracket just recomputes the same bracket.
+      Odd cluster size → one random bye per round. Round 1 pairs adjacent items in upload order
+      (burst shots are usually already adjacent).
+- [x] **Resolution UI** (`DuplicateBracket.svelte`): split-screen, a draggable divider dragged
+      toward the photo to discard; tap-to-pick on either half also works as a fallback.
+      Winner advances (held client-side until the bracket completes); loser is marked `delete`
+      immediately via the same decisions-write path as a normal swipe (revisable later like any
+      other decision). Last-photo-standing gets `duplicateResolved: true` and flows into the
+      normal swipe deck queue. Progress indicator across the whole multi-cluster resolution
+      phase ("Round 2 of 3 · burst 4 of 7").
+- [x] **Design language**: the divider is a gentle S-curve (SVG `<path>`/`clip-path`), not
+      straight — the curve's midpoint follows the drag position, control points scale with the
+      drag offset rather than degenerating into a straight line at the extremes.
 
 ### 3.5 Favorite: the third gesture
 
 Favorite isn't "keep, but more" — it needs to be reachable without accidentally triggering
 delete or keep, which rules out putting it on the same left/right axis.
 
-- [x] Gesture: drag **up**, toward a heart icon fixed at top-center of the card (the "tap
-      heart in the middle" from the original brief, generalized into a drag target rather than
-      a static tap zone — dragging _toward_ a visible target reads more clearly on a live card
-      than a tap that has no motion feedback). The heart icon scales/glows as the card
-      approaches it, giving continuous feedback before release, same as the left/right
-      swipe-dismiss's own approach-feedback (card rotation, opacity change).
-  - A quick tap directly on the heart icon (no drag) also favorites — accessibility/fallback
-    path, same reasoning as duplicate-bracket's tap-to-pick fallback in 3.4.
-- [x] Direction lock (3.1.1) already prevents a horizontal swipe from being misread as
-      favorite and vice versa — no additional disambiguation logic needed beyond what the
-      gesture state machine already does; favorite is just a third exit direction on the same
-      state machine, not a separate mode.
-- [x] Favoriting **keeps** the photo too — `status: 'favorite'` is a distinct enum value
-      (already modeled in `DecisionStatus`), not `keep` + a separate boolean, so the review
-      grid (Section 4) can filter/group by it directly without a compound condition.
-- [x] Exit animation: card shrinks/flies toward the heart rather than off-screen left/right —
-      visually distinct from a delete/keep dismissal so the three outcomes never look the same
-      out of the corner of your eye.
+- [x] Gesture: drag **up** toward a heart icon fixed at top-center of the card, which
+      scales/glows as the card approaches (same approach-feedback pattern as the left/right
+      swipe-dismiss). A quick tap directly on the heart also favorites (accessibility/fallback,
+      same reasoning as §3.4's tap-to-pick).
+- [x] Direction lock (§3.1.1) already prevents horizontal/favorite misreads — favorite is just
+      a third exit direction on the same state machine, not a separate mode.
+- [x] Favoriting **keeps** the photo too — `status: 'favorite'` is a distinct enum value, not
+      `keep` + a boolean, so the review grid (§4) can filter/group by it directly.
+- [x] Exit animation: card shrinks/flies toward the heart, visually distinct from a
+      delete/keep dismissal.
 
 ### 3.6 In-deck undo
 
-Swiping is fast and occasionally a misfire (wrong direction, finger slipped) — a full trip to
-`/albums/[id]/review` to fix one accidental delete breaks flow. This is a _session-scoped
-convenience_ on top of the already-fully-revisable `decisions` table, not new persistence.
+A session-scoped convenience on top of the already-fully-revisable `decisions` table, not new
+persistence.
 
-- [x] Small persistent "undo" affordance (bottom corner, always visible while `history` is
-      non-empty) rather than a shake gesture — shake-to-undo is easy to trigger by accident
-      while just handling the phone during a swipe session, which is exactly the failure mode
-      undo exists to fix; don't introduce a new one.
-- [x] Undo pops the last `history` entry, re-inserts that photo at `queue[0]` (not back into
-      its original position — you want to immediately re-decide the photo you just undid, not
-      lose it back into the shuffle), and writes the reverted status via the same batched
-      decisions endpoint (3.0).
-- [x] Multiple sequential undos walk back through `history` — no arbitrary "undo once only"
-      limitation, bounded only by the 20-entry history cap already noted in 3.0.
-- [x] Undo button shows a one-line reminder of what it'll undo ("Undo: deleted IMG_042.jpg")
-      rather than a bare icon — cheap to build (the data's already in `history`) and removes
-      any hesitation about tapping it.
+- [x] Small persistent "undo" affordance (bottom corner, visible while `history` is non-empty)
+      rather than a shake gesture — shake-to-undo is easy to trigger by accident while just
+      handling the phone during a swipe session, exactly the failure mode undo exists to fix.
+- [x] Undo pops the last `history` entry, re-inserts that photo at `queue[0]` (immediate
+      re-decide, not back into its original position), writes the reverted status via the same
+      batched decisions endpoint (§3.0).
+- [x] Multiple sequential undos walk back through `history`, bounded only by the 20-entry cap.
+- [x] Undo button shows a one-line reminder ("Undo: deleted IMG_042.jpg") rather than a bare
+      icon.
 
 ### 3.7 Progress, empty, and end states
 
-A deck of unknown length with no feedback feels aimless; a deck that's actually empty
-(nothing left to decide) needs to say so rather than rendering nothing.
-
-- [x] Progress indicator (`{decided} / {total}` for this session, plus a thin progress bar) —
-      pull `total` from the same `load` query that hydrates the queue (3.0), decrement as
-      `queue` shrinks. Keep it unobtrusive (small, top-of-screen) — the photo is the point, the
-      counter is orientation, not the main event.
-- [x] Zero-photos-to-decide on deck open (either a brand new album with nothing uploaded yet,
-      or everything's already been decided): don't show an empty deck frame — route straight
-      to a dedicated "nothing to swipe" state with a link to upload (Section 2, if contributor)
-      or review (Section 4).
-- [x] End-of-deck (queue empties out during the session, per 3.0): session summary + links,
-      not an abrupt return to the album page.
+- [x] Progress indicator (`{decided} / {total}` for this session, thin progress bar) — `total`
+      from the same `load` query that hydrates the queue, decrements as `queue` shrinks.
+- [x] Zero-photos-to-decide on deck open routes straight to a dedicated "nothing to swipe"
+      state with a link to upload (if contributor) or review, instead of an empty deck frame.
+- [x] End-of-deck (queue empties during the session): session summary + links, not an abrupt
+      return to the album page.
 - [x] Mid-session "someone else just added photos" isn't handled by a live update in the MVP —
-      the queue is a snapshot from `load` time. Acceptable for now (documented here explicitly
-      so it isn't mistaken for an oversight): re-opening the swipe deck re-queries and picks
-      up anything new. Live-updating an in-progress queue is out of scope until Section 5's
-      `live` resolve mode needs the same SSE infrastructure anyway — build it once, there.
+      the queue is a snapshot from `load` time. Documented explicitly so it isn't mistaken for
+      an oversight: re-opening the swipe deck re-queries and picks up anything new.
+      Live-updating an in-progress queue is out of scope until §5's `live` resolve mode needs
+      the same SSE infrastructure anyway — build it once, there.
 
 ### 3.8 Accessibility & keyboard fallback
 
-Gestures are the primary interaction, but nothing here should be gesture-_only_ — both for
-genuine accessibility and because it makes desktop testing during development far less
-painful than simulating touch for every check.
-
-- [x] Keyboard bindings while the deck is focused: `←` delete, `→` keep, `↑` favorite, `⌘/Ctrl
-  - Z`undo (3.6) — routed through the exact same decision path gestures use (per 3.1's`SwipeButtons` note: one code path for "how a decision gets made", multiple ways to
-    trigger it).
-- [x] `SwipeButtons` (the on-screen delete/favorite/keep buttons) are the primary accessible
-      path — real `<button>` elements with `aria-label`s, not gesture-only affordances, and
-      already required by the original brief's "buttons rotate like a camera app" behavior
-      (3.3), so no extra work, just don't let it regress once gestures are built on top.
+- [x] Keyboard bindings while the deck is focused: `←` delete, `→` keep, `↑` favorite,
+      `⌘/Ctrl+Z` undo (§3.6) — routed through the exact same decision path gestures use.
+- [x] `SwipeButtons` are the primary accessible path — real `<button>` elements with
+      `aria-label`s, not gesture-only affordances.
 - [x] Each card's `<img>` gets `alt={photo.displayName}` — meaningful since album photos often
-      do have descriptive names (Section 2's whole name-conflict UI exists because people name
-      their photos), not decorative filler alt text.
-- [x] Respect `prefers-reduced-motion`: card fly-out/spring-back/rotation animations (3.1.1,
-      3.1.2, 3.5) drop to a simple opacity cross-fade — the swipe deck's _interaction model_
-      doesn't change (still tap/keyboard-drivable), only the motion styling does.
+      have descriptive names.
+- [x] Respects `prefers-reduced-motion`: fly-out/spring-back/rotation animations drop to a
+      simple opacity cross-fade — the interaction model doesn't change, only motion styling.
 
 ### 3.9 Performance targets & device test matrix
 
 Concrete, falsifiable targets — "feels fast" isn't testable, these are:
 
 - [ ] Card-to-card advance (decision made → next card fully interactive) under 100ms on a
-      mid-range Android when the next preview is already prefetched (3.2) — this is the number
-      that actually determines whether the deck "feels instant."
-  - When the next preview is _not_ yet prefetched (cold start, or prefetch fell behind on a
-    bad connection): show the blur-up thumbnail placeholder (3.2) immediately, never a blank
-    frame, while the preview finishes loading.
+      mid-range Android when the next preview is already prefetched (§3.2) — the number that
+      actually determines whether the deck "feels instant." When the next preview is _not_ yet
+      prefetched (cold start, or prefetch fell behind), show the blur-up thumbnail placeholder
+      immediately, never a blank frame.
 - [ ] Gesture-to-visual-feedback (finger moves → card visibly tracks it) must be same-frame —
       no debounce/throttle on the drag handler itself (only the eventual decision write is
-      batched, per 3.0 — the visual response is never delayed for network reasons).
+      batched, per §3.0).
 - [ ] Test matrix, minimum before calling this section done:
-  - Real mid-range Android + real iPhone (not just devtools device emulation, which doesn't
-    reproduce touch-event timing quirks or genuine memory pressure).
-  - Wifi and throttled mobile data (devtools network throttling is fine for _this_ axis, since
-    it's the gesture-and-render latency that needs a real device, not the network latency).
+  - Real mid-range Android + real iPhone (not devtools device emulation — doesn't reproduce
+    touch-event timing quirks or genuine memory pressure).
+  - Wifi and throttled mobile data (devtools network throttling is fine for this axis, since
+    it's gesture-and-render latency that needs a real device, not network latency).
   - A large album (150-200+ photos, some containing multiple burst clusters) to catch memory
-    growth from an unbounded prefetch cache or an unbounded `history` array (already capped at
-    20 in 3.0, but verify the cap is actually enforced under load, not just documented).
-  - Orientation matrix from 3.3 run on both platforms.
+    growth from an unbounded prefetch cache or an unbounded `history` array (capped at 20 in
+    §3.0, but verify the cap is actually enforced under load, not just documented).
+  - Orientation matrix from §3.3 run on both platforms.
 
-Implemented end-to-end: clustering (`clusterOnUpload`, union-find-by-canonical-id) wired into
-the upload endpoint; `swipeDeck.svelte.ts` (optimistic queue/history/batched writes),
-`prefetchQueue.ts`, `orientation.svelte.ts`, `SwipeCard.svelte` (gesture state machine via
-`@use-gesture/vanilla`, transform-origin-based pinch anchoring, swipe/favorite/zoom-pan),
-`SwipeButtons.svelte`, `DuplicateBracket.svelte` (bracket derivation, S-curve divider,
-tap-to-pick fallback), and `/albums/[id]/swipe` tying it together with progress/empty/end
-states, in-deck undo, and keyboard bindings. `POST /albums/[id]/decisions` (batch upsert) and
-`POST /albums/[id]/duplicates/resolve` (flip a photo out of its pending cluster - called for
-both the bracket survivor and, per photo, each eliminated loser) are live.
-
-Verified via `bun run check`/`bun x eslint .` (both clean) and live end-to-end testing against
-a running dev server: uploaded a 3-photo burst plus 2 unique photos, confirmed clustering
-grouped them correctly (`duplicate_group_id`, `perceptual_hash` in the DB), drove a full
-bracket resolution via the API (losers + survivor), confirmed losers are marked
-`duplicateResolved: true` immediately on elimination (an early bug where losers stayed
-perpetually "pending" was caught this way and fixed), and confirmed the swipe deck's own
-decisions endpoint and empty/end-of-queue states respond correctly. **Not yet verified**: real
-gesture interaction (pinch/pan/swipe feel, direction-lock correctness) and the 3.3/3.9 device
-test matrices - those need an actual phone in hand, not curl.
+Implemented end-to-end and verified via `bun run check`/`bun x eslint .` (both clean) and live
+testing against a running dev server: uploaded a 3-photo burst plus 2 unique photos, confirmed
+clustering grouped them correctly, drove a full bracket resolution via the API (losers +
+survivor), confirmed losers are marked `duplicateResolved: true` immediately on elimination (an
+early bug where losers stayed perpetually "pending" was caught this way and fixed), confirmed
+the swipe deck's decisions endpoint and empty/end-of-queue states respond correctly. **Not yet
+verified**: real gesture interaction (pinch/pan/swipe feel, direction-lock correctness) and the
+§3.3/§3.9 device test matrices — those need an actual phone in hand, not curl.
 
 ---
 
 ## 4. Decisions, undo, and the review list
 
 - [x] Swipe writes/updates the `decisions` row for `(photoId, currentUser)` — upsert, not
-      insert, so re-deciding a photo is just a normal update. The swipe deck's own optimistic
-      batched-write path (3.0) and in-deck undo (3.6) are both just callers of this same
-      upsert — this section is about the persistent semantics, not a separate mechanism.
-- [x] `/albums/[id]/review` — a grid/list view of all photos grouped by current decision
-      (deleted / kept / favorited / undecided), with tap-to-flip so any prior decision (including
-      duplicate-bracket losers) can be changed after the fact. This is the durable, cross-session
-      undo — 3.6's in-deck undo is a same-session convenience layered on top of it, not a
-      replacement for it.
+      insert. The swipe deck's optimistic batched-write path (§3.0) and in-deck undo (§3.6) are
+      both just callers of this same upsert.
+- [x] `/albums/[id]/review` — grid/list of all photos grouped by current decision (deleted /
+      kept / favorited / undecided), tap-to-flip so any prior decision (including
+      duplicate-bracket losers) can be changed after the fact. This is the durable,
+      cross-session undo — §3.6's in-deck undo is a same-session convenience layered on top,
+      not a replacement.
 
-Implementation note: `applyDecisions`/`getDecisionsFor` (`decisions.ts`) already had the upsert
-semantics this section needed - no new server logic beyond the read-side grouping in the review
-page's load function. Verified live against the running dev server (album id 2, photos 25-29):
-loaded `/albums/2/review`, confirmed all 5 photos render grouped correctly by their actual
-`decisions` rows (keep/delete/favorite/undecided), flipped photo 26 from `delete` to `keep`
-through the page's own decision endpoint, confirmed the DB row updated, then flipped it back.
-Both the album page ("Review" button) and the swipe deck's end-of-session screen ("Review
-decisions" button) now link here. Not yet built: any visual diff beyond the badge/filter view
-(e.g. before/after comparison) - not asked for by this section's scope.
+Verified live (album id 2, photos 25-29): loaded `/albums/2/review`, confirmed all 5 photos
+render grouped correctly by their actual `decisions` rows, flipped a photo from `delete` to
+`keep` through the page's own decision endpoint, confirmed the DB row updated, flipped it back.
+Both the album page and the swipe deck's end-of-session screen link here. Not built: any visual
+diff beyond the badge/filter view (e.g. before/after comparison) — not asked for by this
+section's scope.
 
 ---
 
@@ -634,20 +423,19 @@ decisions" button) now link here. Not yet built: any visual diff beyond the badg
 - [x] Invite flow: share album by email (creates `album_shares` row) or shareable link
 - [x] Roles: `contributor` (can add photos) vs `viewer` (can only decide)
 - [x] Album management: owner can delete an album (cascades `photos`/`decisions`/etc. via FK
-      `onDelete: cascade` — already modeled in the schema; still needs the disk files under
-      `storage/` cleaned up, since those aren't tracked by the DB's cascade) and revoke a
-      specific share (deletes the `album_shares` row; that user's existing `decisions` rows are
-      left alone so access can be re-granted later without losing their prior swipes)
+      `onDelete: cascade`, plus cleans up the on-disk files under `storage/`, which the DB
+      cascade doesn't touch) and revoke a specific share (deletes the `album_shares` row; that
+      user's existing `decisions` rows are left alone so access can be re-granted later without
+      losing their prior swipes)
 - [x] `decisionMode: independent` — each sharer has their own `decisions` rows, no
-      coordination; a later "merge view" can show where two people agree, but this needs no
-      new mechanism, it's a read-only diff query over the existing table.
-- [x] `decisionMode: together`, two `resolveMode`s:
-  - [x] **`swipe-all-then-resolve`** (build this one first — no realtime infra needed): both
-        people swipe the whole album independently, then a conflict screen shows only the photos
-        where their `decisions.status` differs, for a final joint call
-  - [ ] **`live`** (Phase 2+): as soon as person A swipes a photo, it's removed from person B's
-        live queue via Server-Sent Events (SSE is enough here — one-directional server→client
-        push, no need for full WebSockets/a realtime service)
+      coordination; a later "merge view" could show where two people agree, but needs no new
+      mechanism, just a read-only diff query over the existing table (not built, not asked for).
+- [x] `decisionMode: together`, `swipe-all-then-resolve` resolveMode: both people swipe the
+      whole album independently, then a conflict screen (`/albums/[id]/resolve`) shows only the
+      photos where `decisions.status` differs, for a final joint call.
+- [ ] `live` resolveMode (Phase 2+): as soon as person A swipes a photo, it's removed from
+      person B's live queue via Server-Sent Events (SSE is enough — one-directional
+      server→client push, no need for full WebSockets/a realtime service).
 
 Implementation notes:
 
@@ -662,47 +450,68 @@ Implementation notes:
   decision-mode radio, delete-album danger zone), `/invite/[token]` (accept flow),
   `/albums/[id]/resolve` (conflict screen for `together` mode). API endpoints split across
   `shares/`, `invite-link/`, `decision-mode/`, `delete/`, `resolve/apply/` — deliberately never
-  co-located with a `+page.svelte` in the same directory (see bug below).
-- Login gained a `redirectTo` query param (validated same-origin-path-only, carried through the
-  `magic_links` row across the email round-trip) so `/invite/[token]` can send an unauthenticated
-  visitor to sign in and land right back on the invite instead of on `/`.
+  co-located with a `+page.svelte` in the same directory (see the route-collision gotcha in
+  `CLAUDE.md`).
+- Login's `redirectTo` param round-trips through the `magic_links` row (added a `redirectTo`
+  column) since the email-based flow has no other way to carry state across the async email
+  round-trip.
 - **Real bug found and fixed while wiring this up, not just this section's new routes**: SQLite
   foreign keys were never enforced (`PRAGMA foreign_keys` was `0`) — every `onDelete: cascade`
   in `schema.ts` was silently a no-op. Fixed in `db/index.ts` by opening the `bun:sqlite`
   connection explicitly and enabling the pragma. Verified via `PRAGMA foreign_key_check` (no
   existing violations) and by deleting a throwaway album with a share row and confirming both
-  the album and the share row were gone afterward, not just the album.
-- **Second bug, also pre-existing (not introduced by this section) and also fixed**: a route
-  directory that has both a `+page.svelte`/`+page.server.ts` and a `+server.ts` gets ALL HTTP
-  methods captured by `+server.ts` — a `+server.ts` that only exports `POST` makes `GET` to that
-  same path 405 instead of falling through to the page. This silently broke
-  `/albums/[id]/upload` (pre-existing, from Section 2) and would have broken my own
-  `/invite/[token]`, `/albums/[id]/resolve`, and the main `/albums/[id]` page (the last one from
-  the delete/decision-mode endpoints I initially put directly in `+server.ts` there). Fixed by
-  moving every such endpoint to its own subpath (`upload/submit`, `invite/[token]/accept`,
-  `resolve/apply`, `decision-mode`, `delete`) so no directory mixes page and API routes for
-  overlapping methods. Caught by testing actual `GET` requests against the running dev server,
-  not by type-checking or lint — this class of bug is invisible to both.
-- Verified live: share-by-email (including inviting an address that had never signed in before –
-  needs a placeholder `users` row created first, now handled in `addOrUpdateShare`), shareable
+  the album and the share row were gone afterward.
+- **Second bug, also pre-existing (not introduced by this section) and also fixed**: the
+  `+page.svelte`/`+server.ts` route-collision gotcha (see `CLAUDE.md`) had silently broken
+  `/albums/[id]/upload` since §2, and would have broken this section's own `/invite/[token]`,
+  `/albums/[id]/resolve`, and `/albums/[id]` itself. Fixed by giving every such endpoint its
+  own subpath. Caught by testing actual `GET` requests against the running dev server, not by
+  type-checking or lint — invisible to both.
+- Verified live: share-by-email (including inviting an address that had never signed in before
+  — needs a placeholder `users` row created first, handled in `addOrUpdateShare`), shareable
   link generation + accept, decision-mode switch to `together`, a real 3-way conflict (owner
   keep, one sharer delete, one sharer keep) showing up on `/resolve`, joint resolution
-  overwriting all three participants' `decisions` rows and the conflict disappearing afterward,
-  and album deletion cascading `album_shares` correctly.
-- Not built: `live` resolveMode (explicitly Phase 2+, needs SSE infra not otherwise in this app
-  yet) and the "merge view" mentioned for `independent` mode (explicitly called out in the plan
-  as needing no new mechanism — a nice-to-have, not asked for by this pass).
+  overwriting all three participants' `decisions` rows and the conflict disappearing
+  afterward, and album deletion cascading `album_shares` correctly.
 
 ---
 
 ## 6. Downloads
 
-- [ ] `/albums/[id]/download` — build ZIP of all `keep`/`favorite` originals for the current
-      user, stream it (don't pre-build and store the whole thing) using e.g. `archiver` or
-      `fflate`, write progress to `download_batches`
-- [ ] On completion, mark `photo_downloads` for each included photo × user
-- [ ] Download page shows a per-photo badge: already downloaded / newly added since last
+- [x] `/albums/[id]/download` — build ZIP of all `keep`/`favorite` originals for the current
+      user, stream it (don't pre-build and store the whole thing), write progress to
+      `download_batches`
+- [x] On completion, mark `photo_downloads` for each included photo × user
+- [x] Download page shows a per-photo badge: already downloaded / newly added since last
       download / not yet decided
+
+Implementation notes:
+
+- New `server/downloads.ts`: `listDownloadableFor` (per-photo badge for the page — deleted
+  photos excluded entirely), `photosToDownload` (the actual ZIP contents — every
+  kept/favorited photo; re-downloading is always allowed, "new" is just a badge not a filter),
+  `recordDownloadBatch`/`completeDownloadBatch`/`failDownloadBatch`.
+- Picked `fflate` over `archiver`: pure JS, no native binary, one less thing to fight the
+  NixOS/FHS problem that already bit `sharp`/`better-sqlite3`.
+- Routes: `/albums/[id]/download` (page — badge list + "Download ZIP (N)" link) and
+  `/albums/[id]/download/zip` (`+server.ts`, kept off the page's own directory — same
+  route-collision gotcha as §5). The zip endpoint streams: `fflate`'s `Zip` class emits
+  compressed chunks via callback, piped straight into a `ReadableStream`, so the full archive
+  is never buffered in memory. Each original is still read fully off disk one at a time before
+  being added (not itself streamed), fine at this app's scale (hundreds, not thousands, of
+  photos per album). The `download_batches` row is written `pending` before streaming starts
+  and flipped to `ready` (with `photo_downloads` stamped) only after the whole archive has
+  been generated — a client disconnect mid-stream leaves the batch `pending` rather than
+  falsely marking photos downloaded.
+- Duplicate display names within one ZIP (two different content hashes can legitimately share
+  a file name, §2) get the photo id appended before the extension so the archive never
+  silently overwrites one entry with another.
+- Verified live (album id 2, 1 `keep` + 1 `favorite` + 3 `delete`d photos): download page
+  listed exactly the 2 non-deleted photos as `new`; `/download/zip` returned a valid ZIP
+  (`unzip -t` clean) containing exactly those 2 originals; `download_batches` went
+  `pending` → `ready` with `readyAt` set, `photo_downloads` got one row per included photo;
+  reloading the page then showed both as `downloaded`. Deleted photos never appeared anywhere
+  in this flow.
 
 ---
 
@@ -711,16 +520,15 @@ Implementation notes:
 The core interaction (binary keep-or-delete decision) is already a yin-yang metaphor, so a few
 deliberate visual nods reinforce it without turning the UI kitschy:
 
-- [ ] The duplicate-resolution split-screen divider (3.4) is a curved S-line, not straight —
-      literally the yin-yang boundary shape. Implement as an SVG path or `clip-path`, draggable
-      by updating the curve's control point instead of a straight `translateX`.
+- [x] The duplicate-resolution split-screen divider (§3.4) is a curved S-line, not straight —
+      literally the yin-yang boundary shape.
 - [ ] Consider echoing the same curve as a subtle background element behind the swipe deck's
       keep/delete zone indicators (e.g. two soft curved regions instead of a hard left/right
-      split when the user starts a drag) — evaluate once the swipe deck exists, don't
-      over-invest here before the core mechanic is proven.
-- [ ] Keep it to these two spots for the MVP. Don't reach for yin-yang imagery in navigation
-      chrome, icons, or the logo yet — that's a branding decision to make once the app has a
-      shape, not before.
+      split when the user starts a drag) — low priority, evaluate only if it's cheap once
+      real-device testing (§3.9) is otherwise done.
+- Deliberately kept to just these two spots for the MVP — no yin-yang imagery in navigation
+  chrome, icons, or the logo; that's a branding decision for once the app has a shape, not
+  before.
 
 ---
 
@@ -729,29 +537,16 @@ deliberate visual nods reinforce it without turning the UI kitschy:
 Listed so gaps read as deliberate deferrals, not oversights:
 
 - **Video support** — photos only, as scoped from the start
-- **Storage garbage collection** — deleting an album/photo removes DB rows (cascades) but not
-  the on-disk file yet (see 5. Album management); a periodic "sweep files with no matching DB
-  row" job is a reasonable later addition once real usage shows it's needed
+- **Storage garbage collection** — deleting an album/photo removes DB rows (cascades) and,
+  since §5/§6, the on-disk files for full album/photo deletion; a periodic "sweep files with no
+  matching DB row" job as a defense-in-depth backstop is a reasonable later addition once real
+  usage shows it's needed, not before
 - **Automated tests** — no vitest/playwright setup yet. Worth adding once the swipe-deck
-  gesture logic (3.1) stabilizes, since that's the part most likely to regress silently
+  gesture logic (§3.1) stabilizes, since that's the part most likely to regress silently
 - **Production process management** (PM2 config, systemd unit, reverse-proxy config) — sibling
   projects use `pm2.config.cjs`; add the equivalent once there's an actual deploy target
 - **Admin/moderation tooling** — not needed at family-and-friends scale; revisit only if that
   changes
-- **Accessibility pass** (screen reader support for the swipe deck, reduced-motion mode) — a
-  real gap for a gesture-heavy UI, but deliberately deferred past MVP given the target audience
-
----
-
-## Suggested build order
-
-1. Auth (`/login`, `/login/verify`, logout) — small, unblocks everything behind a login wall
-2. Albums CRUD + upload (incl. hashing/dedup/name-conflict UI)
-3. Swipe deck v1: gesture state machine + zoom, on preview images, **no** prefetching or
-   duplicate-resolution yet — get the core feel right on a real phone first
-4. Lazy-load/prefetch layer (3.2) — retrofit onto the working swipe deck
-5. Orientation handling (3.3)
-6. Review/undo list (4)
-7. Duplicate-cluster resolution screen (3.4)
-8. Sharing: independent mode first, then swipe-all-then-resolve, then live (5)
-9. Downloads (6)
+- **Accessibility pass** (screen reader support for the swipe deck, reduced-motion mode beyond
+  §3.8's `prefers-reduced-motion` handling) — a real gap for a gesture-heavy UI, but
+  deliberately deferred past MVP given the target audience
