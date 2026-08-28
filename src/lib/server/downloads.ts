@@ -14,6 +14,23 @@ export type DownloadListEntry = {
 	badge: DownloadBadge;
 };
 
+type PhotoWithStatus = { photo: Photo; status: DecisionStatus };
+
+// Shared fetch: every photo in the album alongside this user's current decision on it (or
+// `Undecided` if they haven't decided yet). Both `listDownloadableFor` and `photosToDownload`
+// filter this same result differently, rather than each re-fetching photos and decisions.
+async function photosWithStatus(albumId: number, email: string): Promise<PhotoWithStatus[]> {
+	const photos = await listPhotos(albumId);
+	const decisions = await getDecisionsFor(
+		email,
+		photos.map((photo) => photo.id)
+	);
+	return photos.map((photo) => ({
+		photo,
+		status: decisions.get(photo.id) ?? DecisionStatus.Undecided
+	}));
+}
+
 // Every non-deleted photo this user can potentially download, with a badge showing whether
 // it's already in a prior ZIP, newly kept/favorited since then, or still undecided - deleted
 // photos are excluded outright, they were never download candidates.
@@ -21,25 +38,18 @@ export async function listDownloadableFor(
 	albumId: number,
 	email: string
 ): Promise<DownloadListEntry[]> {
-	const photos = await listPhotos(albumId);
-	const decisions = await getDecisionsFor(
-		email,
-		photos.map((photo) => photo.id)
-	);
-	const downloadedRows = await db.query.photoDownloads.findMany({
-		where: and(
-			eq(photoDownloads.email, email),
-			inArray(
-				photoDownloads.photoId,
-				photos.map((photo) => photo.id)
-			)
-		)
-	});
+	const withStatus = await photosWithStatus(albumId, email);
+	const photoIds = withStatus.map(({ photo }) => photo.id);
+	const downloadedRows =
+		photoIds.length === 0
+			? []
+			: await db.query.photoDownloads.findMany({
+					where: and(eq(photoDownloads.email, email), inArray(photoDownloads.photoId, photoIds))
+				});
 	const downloadedIds = new Set(downloadedRows.map((row) => row.photoId));
 
 	const entries: DownloadListEntry[] = [];
-	for (const photo of photos) {
-		const decision = decisions.get(photo.id) ?? DecisionStatus.Undecided;
+	for (const { photo, status: decision } of withStatus) {
 		if (decision === DecisionStatus.Delete) continue;
 		const badge: DownloadBadge =
 			decision === DecisionStatus.Undecided
@@ -56,15 +66,10 @@ export async function listDownloadableFor(
 // it was included in an earlier download - re-downloading is always allowed, "new" is just a
 // badge, not a filter.
 export async function photosToDownload(albumId: number, email: string): Promise<Photo[]> {
-	const photos = await listPhotos(albumId);
-	const decisions = await getDecisionsFor(
-		email,
-		photos.map((photo) => photo.id)
-	);
-	return photos.filter((photo) => {
-		const status = decisions.get(photo.id) ?? DecisionStatus.Undecided;
-		return status === DecisionStatus.Keep || status === DecisionStatus.Favorite;
-	});
+	const withStatus = await photosWithStatus(albumId, email);
+	return withStatus
+		.filter(({ status }) => status === DecisionStatus.Keep || status === DecisionStatus.Favorite)
+		.map(({ photo }) => photo);
 }
 
 export async function recordDownloadBatch(

@@ -22,12 +22,13 @@
 	let { data }: { data: PageData } = $props();
 
 	let openIndex: number | null = $state(null);
+	let pageElement: HTMLDivElement;
 	let selected = new SvelteSet<number>();
 	let errorMessage: string | null = $state(null);
 	let statuses = new SvelteMap<number, DecisionStatus>();
 	$effect(() => {
 		statuses.clear();
-		for (const [i, photo] of data.photos.entries()) statuses.set(photo.id, data.statuses[i]);
+		for (const [photoId, status] of data.decisions) statuses.set(photoId, status);
 	});
 
 	async function setStatus(photo: Photo, status: DecisionStatus): Promise<void> {
@@ -134,7 +135,7 @@
 	<title>{data.album.name} — Yangle</title>
 </svelte:head>
 
-<div class="mx-auto flex min-h-full max-w-md flex-col gap-6 p-6">
+<div bind:this={pageElement} class="mx-auto flex min-h-full max-w-md flex-col gap-6 p-6">
 	<div class="flex items-center justify-between">
 		<h1 class="truncate text-2xl font-semibold">{data.album.name}</h1>
 		<div class="flex gap-2">
@@ -236,7 +237,7 @@
 	{#if data.photos.length > 0}
 		<button
 			type="button"
-			onclick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+			onclick={() => pageElement.scrollIntoView({ behavior: 'smooth' })}
 			class="link link-hover flex items-center gap-1 self-start text-sm text-base-content/60"
 		>
 			<ArrowUp class="size-4" /> Back to top
