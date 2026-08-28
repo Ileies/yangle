@@ -1,0 +1,1 @@
+ALTER TABLE `magic_links` ADD `created_at` integer NOT NULL;

@@ -1,0 +1,1 @@
+ALTER TABLE `photos` ADD `compat_original_path` text;

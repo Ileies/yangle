@@ -1,0 +1,41 @@
+{
+	"version": "7",
+	"dialect": "sqlite",
+	"entries": [
+		{
+			"idx": 0,
+			"version": "6",
+			"when": 1787840041175,
+			"tag": "0000_luxuriant_warlock",
+			"breakpoints": true
+		},
+		{
+			"idx": 1,
+			"version": "6",
+			"when": 1787842884906,
+			"tag": "0001_glossy_storm",
+			"breakpoints": true
+		},
+		{
+			"idx": 2,
+			"version": "6",
+			"when": 1787844065660,
+			"tag": "0002_overjoyed_silverclaw",
+			"breakpoints": true
+		},
+		{
+			"idx": 3,
+			"version": "6",
+			"when": 1787899143496,
+			"tag": "0003_ambiguous_gateway",
+			"breakpoints": true
+		},
+		{
+			"idx": 4,
+			"version": "6",
+			"when": 1787904273140,
+			"tag": "0004_panoramic_ink",
+			"breakpoints": true
+		}
+	]
+}
