@@ -285,22 +285,19 @@ Plain swiping is a bad UX for 20 near-identical shots — every one _feels_ like
 end up keeping most of the burst by accident. Instead, pre-resolve clusters before they ever
 reach the swipe deck.
 
-- [x] **Clustering**: `perceptualHash` (dHash, computed on upload) + `hammingDistance()` group
-      photos within `DUPLICATE_HAMMING_THRESHOLD` (8) into a `duplicateGroupId`. Runs
-      synchronously right after `storeUpload()` inside the upload endpoint, comparing only
-      against existing **unresolved-cluster** hashes in the album — cheap enough at album scale
-      (hundreds, not millions, of photos) to not need a background job for the MVP. Union-find
-      (not naive pairwise grouping) merges clusters when a new photo matches two previously-
-      separate ones. Note: this is O(n) per uploaded photo against the unresolved set, so a
-      single batch upload of N files does O(n²) work in N — fine at hundreds of photos/album,
-      revisit (background job, or an indexed approximate-match structure) if albums start
-      regularly growing past roughly a thousand unresolved photos.
+- [x] **Clustering**: burst detection is scoped to the photos added by one upload request, so an
+      old album photo can never be reopened merely because a later scene has a similar layout.
+      EXIF capture times (when both exist), orientation, and aspect ratio gate candidates first;
+      dHash is only a cheap prefilter. Windowed SSIM over normalized luminance plus a color-
+      histogram intersection must then both pass. Complete-link clustering requires every pair
+      in a group to match, preventing transitive `A ≈ B ≈ C` bridge chains. This remains O(n²) within
+      one upload request, which is acceptable at the intended album sizes.
 - [x] **Bracket data structure**: a cluster of N unresolved photos becomes a single-elimination
       bracket, computed client-side from the cluster's photo list — no new DB table, the
       bracket's _current_ state is fully derivable from which photos still have
       `duplicateResolved: false`, so a page reload mid-bracket just recomputes the same bracket.
-      Odd cluster size → one random bye per round. Round 1 pairs adjacent items in upload order
-      (burst shots are usually already adjacent).
+      Odd cluster size → one bye per round. Each round greedily pairs the closest remaining dHash
+      fingerprints, rather than relying on incidental upload order.
 - [x] **Resolution UI** (`DuplicateBracket.svelte`): split-screen, a draggable divider dragged
       toward the photo to discard; tap-to-pick on either half also works as a fallback.
       Winner advances (held client-side until the bracket completes); loser is marked `delete`

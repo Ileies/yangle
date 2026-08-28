@@ -18,9 +18,9 @@ SQLite app that keeps uploaded photos on local disk.
 - **Dedup on upload** — content-hash based, so re-uploading the same photo (even renamed) never
   creates a duplicate; a name conflict on the same content prompts you to pick which name to
   keep.
-- **Burst/near-duplicate resolution** — a perceptual-hash cluster of visually similar shots (a
-  burst of 20 near-identical photos) is resolved via a single-elimination bracket before it
-  ever reaches the swipe deck, instead of making you judge each one as if it were unique.
+- **Burst/near-duplicate resolution** — photos from one upload are gated by capture metadata,
+  then verified with dHash, structural similarity, and color similarity. Confirmed bursts are
+  resolved via a single-elimination bracket before they reach the swipe deck.
 - **The swipe deck** — full-screen, gesture-driven keep/delete/favorite triage with pinch-zoom,
   prefetching, orientation handling, in-deck undo, and a durable review list for changing your
   mind later. See `TODO.md` §3 for the full design rationale.
