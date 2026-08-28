@@ -1,11 +1,10 @@
 import { db } from './db';
 import { photoNameVariants, photos } from './db/schema';
-import { and, eq, inArray, isNotNull, ne } from 'drizzle-orm';
-import { DUPLICATE_HAMMING_THRESHOLD } from '$lib/constants';
-import { hammingDistance } from '$lib/utils';
+import { and, eq, inArray } from 'drizzle-orm';
 import { deleteStoredFiles } from './storage';
 import type { StoredImage } from './storage';
 import type { Photo } from '$lib/types';
+import { buildBurstClusters, type BurstCandidate } from './burstSimilarity';
 import { compareImageNames } from '$lib/imageNames';
 
 // Of these content hashes, which ones already exist in the album - keyed by hash so the
@@ -123,7 +122,7 @@ export async function deletePhotos(albumId: number, ids: number[]): Promise<void
 }
 
 // Photos still awaiting a decision from this user, excluding ones stuck in an unresolved
-// duplicate cluster (those must go through the bracket first, see clusterOnUpload below).
+// duplicate cluster (those must go through the bracket first, see clusterUploadBatch below).
 export async function listResolvedUndecided(albumId: number): Promise<Photo[]> {
 	return db.query.photos.findMany({
 		where: and(eq(photos.albumId, albumId), eq(photos.duplicateResolved, true)),
@@ -140,51 +139,31 @@ export async function listPendingDuplicateClusters(albumId: number): Promise<Pho
 	});
 }
 
-// Union-find-style clustering, run synchronously right after a new photo is stored. Compares
-// the new photo's perceptual hash against every other still-unresolved photo in the album
-// (already-resolved singles don't need re-comparison - once resolved, a photo is done). If no
-// match is found the photo is an immediate singleton, resolved on the spot. Otherwise it joins
-// (and if needed merges) the matched cluster(s), reopening any of them that had already been
-// marked resolved as a singleton.
-export async function clusterOnUpload(albumId: number, newPhoto: Photo): Promise<void> {
-	if (!newPhoto.perceptualHash) return;
+// Cluster only the photos from this upload request. Historical album photos are intentionally
+// excluded: this feature identifies camera bursts, not semantically similar scenes taken days
+// apart. Complete-link matching and the stronger fingerprints live in burstSimilarity.ts.
+export async function clusterUploadBatch(
+	albumId: number,
+	candidates: BurstCandidate<Photo>[]
+): Promise<void> {
+	if (candidates.length === 0) return;
+	const ids = candidates.map(({ photo }) => photo.id);
 
-	const candidates = await db.query.photos.findMany({
-		where: and(
-			eq(photos.albumId, albumId),
-			isNotNull(photos.perceptualHash),
-			ne(photos.id, newPhoto.id)
-		)
-	});
-	const matches = candidates.filter(
-		(candidate) =>
-			hammingDistance(candidate.perceptualHash!, newPhoto.perceptualHash!) <=
-			DUPLICATE_HAMMING_THRESHOLD
-	);
-
-	if (matches.length === 0) {
-		await db.update(photos).set({ duplicateResolved: true }).where(eq(photos.id, newPhoto.id));
-		return;
-	}
-
-	const existingGroupIds = [
-		...new Set(matches.map((m) => m.duplicateGroupId).filter((id): id is number => id != null))
-	];
-	const canonicalGroupId = Math.min(newPhoto.id, ...matches.map((m) => m.id), ...existingGroupIds);
-
-	const memberIds = [newPhoto.id, ...matches.map((m) => m.id)];
+	// Fail safe: photos start as ordinary swipe items. Only verified multi-photo clusters are
+	// moved into duplicate resolution by the updates below.
 	await db
 		.update(photos)
-		.set({ duplicateGroupId: canonicalGroupId, duplicateResolved: false })
-		.where(inArray(photos.id, memberIds));
+		.set({ duplicateGroupId: null, duplicateResolved: true })
+		.where(and(eq(photos.albumId, albumId), inArray(photos.id, ids)));
 
-	// Merge: any other member of a matched photo's pre-existing group also moves to the
-	// canonical group id, even if it didn't itself hash-match the new photo directly.
-	if (existingGroupIds.length > 0) {
+	for (const cluster of buildBurstClusters(candidates)) {
+		if (cluster.length < 2) continue;
+		const memberIds = cluster.map(({ photo }) => photo.id);
+		const groupId = Math.min(...memberIds);
 		await db
 			.update(photos)
-			.set({ duplicateGroupId: canonicalGroupId, duplicateResolved: false })
-			.where(and(eq(photos.albumId, albumId), inArray(photos.duplicateGroupId, existingGroupIds)));
+			.set({ duplicateGroupId: groupId, duplicateResolved: false })
+			.where(and(eq(photos.albumId, albumId), inArray(photos.id, memberIds)));
 	}
 }
 

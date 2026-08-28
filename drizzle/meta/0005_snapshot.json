@@ -1,0 +1,796 @@
+{
+	"id": "a8cec3a6-b960-46a5-911b-0654f3ef79b7",
+	"prevId": "c1c8657e-fa26-400b-af8e-51fa79284275",
+	"version": "6",
+	"dialect": "sqlite",
+	"tables": {
+		"album_shares": {
+			"name": "album_shares",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "integer",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": true
+				},
+				"album_id": {
+					"name": "album_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"email": {
+					"name": "email",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"role": {
+					"name": "role",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "'viewer'"
+				},
+				"invited_at": {
+					"name": "invited_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				}
+			},
+			"indexes": {
+				"album_shares_album_id_email_unique": {
+					"name": "album_shares_album_id_email_unique",
+					"columns": ["album_id", "email"],
+					"isUnique": true
+				}
+			},
+			"foreignKeys": {
+				"album_shares_album_id_albums_id_fk": {
+					"name": "album_shares_album_id_albums_id_fk",
+					"tableFrom": "album_shares",
+					"columnsFrom": ["album_id"],
+					"tableTo": "albums",
+					"columnsTo": ["id"],
+					"onUpdate": "no action",
+					"onDelete": "cascade"
+				},
+				"album_shares_email_users_email_fk": {
+					"name": "album_shares_email_users_email_fk",
+					"tableFrom": "album_shares",
+					"columnsFrom": ["email"],
+					"tableTo": "users",
+					"columnsTo": ["email"],
+					"onUpdate": "no action",
+					"onDelete": "cascade"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		},
+		"albums": {
+			"name": "albums",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "integer",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": true
+				},
+				"owner_email": {
+					"name": "owner_email",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"name": {
+					"name": "name",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"decision_mode": {
+					"name": "decision_mode",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "'independent'"
+				},
+				"resolve_mode": {
+					"name": "resolve_mode",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"invite_token": {
+					"name": "invite_token",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"invite_role": {
+					"name": "invite_role",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				}
+			},
+			"indexes": {
+				"albums_invite_token_unique": {
+					"name": "albums_invite_token_unique",
+					"columns": ["invite_token"],
+					"isUnique": true
+				}
+			},
+			"foreignKeys": {
+				"albums_owner_email_users_email_fk": {
+					"name": "albums_owner_email_users_email_fk",
+					"tableFrom": "albums",
+					"columnsFrom": ["owner_email"],
+					"tableTo": "users",
+					"columnsTo": ["email"],
+					"onUpdate": "no action",
+					"onDelete": "cascade"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		},
+		"decisions": {
+			"name": "decisions",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "integer",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": true
+				},
+				"photo_id": {
+					"name": "photo_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"email": {
+					"name": "email",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"status": {
+					"name": "status",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "'undecided'"
+				},
+				"decided_at": {
+					"name": "decided_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				}
+			},
+			"indexes": {
+				"decisions_photo_id_email_unique": {
+					"name": "decisions_photo_id_email_unique",
+					"columns": ["photo_id", "email"],
+					"isUnique": true
+				}
+			},
+			"foreignKeys": {
+				"decisions_photo_id_photos_id_fk": {
+					"name": "decisions_photo_id_photos_id_fk",
+					"tableFrom": "decisions",
+					"columnsFrom": ["photo_id"],
+					"tableTo": "photos",
+					"columnsTo": ["id"],
+					"onUpdate": "no action",
+					"onDelete": "cascade"
+				},
+				"decisions_email_users_email_fk": {
+					"name": "decisions_email_users_email_fk",
+					"tableFrom": "decisions",
+					"columnsFrom": ["email"],
+					"tableTo": "users",
+					"columnsTo": ["email"],
+					"onUpdate": "no action",
+					"onDelete": "cascade"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		},
+		"download_batch_photos": {
+			"name": "download_batch_photos",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "integer",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": true
+				},
+				"batch_id": {
+					"name": "batch_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"photo_id": {
+					"name": "photo_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				}
+			},
+			"indexes": {
+				"download_batch_photos_batch_id_photo_id_unique": {
+					"name": "download_batch_photos_batch_id_photo_id_unique",
+					"columns": ["batch_id", "photo_id"],
+					"isUnique": true
+				}
+			},
+			"foreignKeys": {
+				"download_batch_photos_batch_id_download_batches_id_fk": {
+					"name": "download_batch_photos_batch_id_download_batches_id_fk",
+					"tableFrom": "download_batch_photos",
+					"columnsFrom": ["batch_id"],
+					"tableTo": "download_batches",
+					"columnsTo": ["id"],
+					"onUpdate": "no action",
+					"onDelete": "cascade"
+				},
+				"download_batch_photos_photo_id_photos_id_fk": {
+					"name": "download_batch_photos_photo_id_photos_id_fk",
+					"tableFrom": "download_batch_photos",
+					"columnsFrom": ["photo_id"],
+					"tableTo": "photos",
+					"columnsTo": ["id"],
+					"onUpdate": "no action",
+					"onDelete": "cascade"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		},
+		"download_batches": {
+			"name": "download_batches",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "integer",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": true
+				},
+				"album_id": {
+					"name": "album_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"email": {
+					"name": "email",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"status": {
+					"name": "status",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": "'pending'"
+				},
+				"zip_path": {
+					"name": "zip_path",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"requested_at": {
+					"name": "requested_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"ready_at": {
+					"name": "ready_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"download_batches_album_id_albums_id_fk": {
+					"name": "download_batches_album_id_albums_id_fk",
+					"tableFrom": "download_batches",
+					"columnsFrom": ["album_id"],
+					"tableTo": "albums",
+					"columnsTo": ["id"],
+					"onUpdate": "no action",
+					"onDelete": "cascade"
+				},
+				"download_batches_email_users_email_fk": {
+					"name": "download_batches_email_users_email_fk",
+					"tableFrom": "download_batches",
+					"columnsFrom": ["email"],
+					"tableTo": "users",
+					"columnsTo": ["email"],
+					"onUpdate": "no action",
+					"onDelete": "cascade"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		},
+		"magic_links": {
+			"name": "magic_links",
+			"columns": {
+				"token": {
+					"name": "token",
+					"type": "text",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"email": {
+					"name": "email",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"expires_at": {
+					"name": "expires_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"consumed_at": {
+					"name": "consumed_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"redirect_to": {
+					"name": "redirect_to",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		},
+		"photo_downloads": {
+			"name": "photo_downloads",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "integer",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": true
+				},
+				"photo_id": {
+					"name": "photo_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"email": {
+					"name": "email",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"downloaded_at": {
+					"name": "downloaded_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				}
+			},
+			"indexes": {
+				"photo_downloads_photo_id_email_unique": {
+					"name": "photo_downloads_photo_id_email_unique",
+					"columns": ["photo_id", "email"],
+					"isUnique": true
+				}
+			},
+			"foreignKeys": {
+				"photo_downloads_photo_id_photos_id_fk": {
+					"name": "photo_downloads_photo_id_photos_id_fk",
+					"tableFrom": "photo_downloads",
+					"columnsFrom": ["photo_id"],
+					"tableTo": "photos",
+					"columnsTo": ["id"],
+					"onUpdate": "no action",
+					"onDelete": "cascade"
+				},
+				"photo_downloads_email_users_email_fk": {
+					"name": "photo_downloads_email_users_email_fk",
+					"tableFrom": "photo_downloads",
+					"columnsFrom": ["email"],
+					"tableTo": "users",
+					"columnsTo": ["email"],
+					"onUpdate": "no action",
+					"onDelete": "cascade"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		},
+		"photo_name_variants": {
+			"name": "photo_name_variants",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "integer",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": true
+				},
+				"photo_id": {
+					"name": "photo_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"name": {
+					"name": "name",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"seen_at": {
+					"name": "seen_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"photo_name_variants_photo_id_photos_id_fk": {
+					"name": "photo_name_variants_photo_id_photos_id_fk",
+					"tableFrom": "photo_name_variants",
+					"columnsFrom": ["photo_id"],
+					"tableTo": "photos",
+					"columnsTo": ["id"],
+					"onUpdate": "no action",
+					"onDelete": "cascade"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		},
+		"photos": {
+			"name": "photos",
+			"columns": {
+				"id": {
+					"name": "id",
+					"type": "integer",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": true
+				},
+				"album_id": {
+					"name": "album_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"content_hash": {
+					"name": "content_hash",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"perceptual_hash": {
+					"name": "perceptual_hash",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"duplicate_group_id": {
+					"name": "duplicate_group_id",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"duplicate_resolved": {
+					"name": "duplicate_resolved",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false,
+					"default": false
+				},
+				"display_name": {
+					"name": "display_name",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"original_path": {
+					"name": "original_path",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"compat_original_path": {
+					"name": "compat_original_path",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"thumbnail_path": {
+					"name": "thumbnail_path",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"preview_path": {
+					"name": "preview_path",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"width": {
+					"name": "width",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"height": {
+					"name": "height",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"orientation": {
+					"name": "orientation",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"file_size": {
+					"name": "file_size",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"taken_at": {
+					"name": "taken_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"latitude": {
+					"name": "latitude",
+					"type": "real",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"longitude": {
+					"name": "longitude",
+					"type": "real",
+					"primaryKey": false,
+					"notNull": false,
+					"autoincrement": false
+				},
+				"uploaded_by": {
+					"name": "uploaded_by",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"uploaded_at": {
+					"name": "uploaded_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				}
+			},
+			"indexes": {
+				"photos_album_id_content_hash_unique": {
+					"name": "photos_album_id_content_hash_unique",
+					"columns": ["album_id", "content_hash"],
+					"isUnique": true
+				}
+			},
+			"foreignKeys": {
+				"photos_album_id_albums_id_fk": {
+					"name": "photos_album_id_albums_id_fk",
+					"tableFrom": "photos",
+					"columnsFrom": ["album_id"],
+					"tableTo": "albums",
+					"columnsTo": ["id"],
+					"onUpdate": "no action",
+					"onDelete": "cascade"
+				},
+				"photos_uploaded_by_users_email_fk": {
+					"name": "photos_uploaded_by_users_email_fk",
+					"tableFrom": "photos",
+					"columnsFrom": ["uploaded_by"],
+					"tableTo": "users",
+					"columnsTo": ["email"],
+					"onUpdate": "no action",
+					"onDelete": "no action"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		},
+		"sessions": {
+			"name": "sessions",
+			"columns": {
+				"token": {
+					"name": "token",
+					"type": "text",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"email": {
+					"name": "email",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"expires_at": {
+					"name": "expires_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {
+				"sessions_email_users_email_fk": {
+					"name": "sessions_email_users_email_fk",
+					"tableFrom": "sessions",
+					"columnsFrom": ["email"],
+					"tableTo": "users",
+					"columnsTo": ["email"],
+					"onUpdate": "no action",
+					"onDelete": "cascade"
+				}
+			},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		},
+		"users": {
+			"name": "users",
+			"columns": {
+				"email": {
+					"name": "email",
+					"type": "text",
+					"primaryKey": true,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"display_name": {
+					"name": "display_name",
+					"type": "text",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				},
+				"created_at": {
+					"name": "created_at",
+					"type": "integer",
+					"primaryKey": false,
+					"notNull": true,
+					"autoincrement": false
+				}
+			},
+			"indexes": {},
+			"foreignKeys": {},
+			"compositePrimaryKeys": {},
+			"uniqueConstraints": {},
+			"checkConstraints": {}
+		}
+	},
+	"views": {},
+	"enums": {},
+	"_meta": {
+		"columns": {},
+		"schemas": {},
+		"tables": {}
+	},
+	"internal": {
+		"indexes": {}
+	}
+}

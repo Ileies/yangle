@@ -7,16 +7,17 @@ import { STORAGE_DIR } from '$env/static/private';
 import { IMAGE_QUALITY, PREVIEW_MAX_PX, THUMBNAIL_MAX_PX } from '$lib/constants';
 import { Orientation } from '$lib/types';
 import { sha256Hex } from '$lib/utils';
+import type { BurstFingerprint } from './burstSimilarity';
 
 export function storagePath(...segments: string[]): string {
 	return path.join(STORAGE_DIR, ...segments);
 }
 
-// 8x8 difference hash. Unlike the exact content hash above, this is robust to the minor
-// compression/exposure differences between near-duplicate burst shots, which is what lets us
-// cluster them for the pairwise duplicate-resolution screen before they hit the swipe deck.
+// 8x8 difference hash. This is only the cheap first pass for burst candidates; SSIM and color
+// similarity must also pass before photos are allowed into the same duplicate group.
 async function dHash(buffer: Buffer): Promise<string> {
 	const { data } = await sharp(buffer)
+		.autoOrient()
 		.resize(9, 8, { fit: 'fill' })
 		.grayscale()
 		.raw()
@@ -34,9 +35,35 @@ async function dHash(buffer: Buffer): Promise<string> {
 	return hex;
 }
 
+async function burstFingerprint(buffer: Buffer): Promise<BurstFingerprint> {
+	const imageSize = 64;
+	const { data, info } = await sharp(buffer)
+		.autoOrient()
+		.resize(imageSize, imageSize, { fit: 'fill' })
+		.toColourspace('srgb')
+		.removeAlpha()
+		.raw()
+		.toBuffer({ resolveWithObject: true });
+	const luminance: number[] = [];
+	const colorHistogram = Array<number>(64).fill(0);
+	const pixelCount = imageSize * imageSize;
+	for (let i = 0; i < pixelCount; i++) {
+		const offset = i * info.channels;
+		const red = data[offset];
+		const green = data[offset + 1];
+		const blue = data[offset + 2];
+		luminance.push(0.2126 * red + 0.7152 * green + 0.0722 * blue);
+		const bin = Math.min(3, red >> 6) * 16 + Math.min(3, green >> 6) * 4 + Math.min(3, blue >> 6);
+		colorHistogram[bin]++;
+	}
+	for (let i = 0; i < colorHistogram.length; i++) colorHistogram[i] /= pixelCount;
+	return { dHash: await dHash(buffer), luminance, colorHistogram, imageSize };
+}
+
 export type StoredImage = {
 	contentHash: string;
 	perceptualHash: string;
+	burstFingerprint: BurstFingerprint;
 	width: number;
 	height: number;
 	orientation: Orientation;
@@ -78,10 +105,11 @@ async function writeAtomic(
 // disk (same bytes uploaded again, possibly under a different name).
 export async function storeUpload(buffer: Buffer, extensionHint: string): Promise<StoredImage> {
 	const contentHash = await sha256Hex(Uint8Array.from(buffer));
-	const perceptualHash = await dHash(buffer);
+	const fingerprint = await burstFingerprint(buffer);
+	const perceptualHash = fingerprint.dHash;
 	const metadata = await sharp(buffer).metadata();
-	const width = metadata.width ?? 0;
-	const height = metadata.height ?? 0;
+	const width = metadata.autoOrient.width ?? metadata.width ?? 0;
+	const height = metadata.autoOrient.height ?? metadata.height ?? 0;
 	const orientation = width >= height ? Orientation.Landscape : Orientation.Portrait;
 
 	// EXIF absence (screenshots, downloaded images, stripped-metadata exports) is expected, not
@@ -104,19 +132,21 @@ export async function storeUpload(buffer: Buffer, extensionHint: string): Promis
 		await writeAtomic(storagePath(originalRelative), (tempPath) => Bun.write(tempPath, buffer));
 		await writeAtomic(storagePath(previewRelative), (tempPath) =>
 			sharp(buffer)
+				.autoOrient()
 				.resize(PREVIEW_MAX_PX, PREVIEW_MAX_PX, { fit: 'inside', withoutEnlargement: true })
 				.webp({ quality: IMAGE_QUALITY })
 				.toFile(tempPath)
 		);
 		await writeAtomic(storagePath(thumbnailRelative), (tempPath) =>
 			sharp(buffer)
+				.autoOrient()
 				.resize(THUMBNAIL_MAX_PX, THUMBNAIL_MAX_PX, { fit: 'inside', withoutEnlargement: true })
 				.webp({ quality: IMAGE_QUALITY })
 				.toFile(tempPath)
 		);
 		if (compatOriginalRelative) {
 			await writeAtomic(storagePath(compatOriginalRelative), (tempPath) =>
-				sharp(buffer).jpeg({ quality: 92 }).toFile(tempPath)
+				sharp(buffer).autoOrient().jpeg({ quality: 92 }).toFile(tempPath)
 			);
 		}
 	}
@@ -124,6 +154,7 @@ export async function storeUpload(buffer: Buffer, extensionHint: string): Promis
 	return {
 		contentHash,
 		perceptualHash,
+		burstFingerprint: fingerprint,
 		width,
 		height,
 		orientation,

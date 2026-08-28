@@ -83,8 +83,8 @@ export const photos = sqliteTable(
 		// sha256 of the file content. Uploading the same bytes twice (even under a different
 		// name) resolves to the existing row instead of creating a duplicate.
 		contentHash: text('content_hash').notNull(),
-		// Perceptual hash (dHash), used to cluster visually-similar-but-not-identical photos
-		// (e.g. a 20-shot burst) so they can be pre-resolved before entering the swipe deck.
+		// Perceptual hash (dHash), used as a cheap prefilter and for closest-pair ordering. Burst
+		// clustering also requires capture metadata, SSIM, and color similarity to pass.
 		perceptualHash: text('perceptual_hash'),
 		duplicateGroupId: integer('duplicate_group_id'),
 		duplicateResolved: integer('duplicate_resolved', { mode: 'boolean' }).default(false).notNull(),

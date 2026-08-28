@@ -17,10 +17,6 @@ export const IMAGE_QUALITY = 82;
 // preview images ready for, fetched only while the current photo isn't itself still loading.
 export const PREFETCH_AHEAD_COUNT = 4;
 
-// Near-duplicate clustering (burst shots). Dhash is a 64-bit hash; two photos within this
-// Hamming distance are considered visually similar enough to require pre-resolution.
-export const DUPLICATE_HAMMING_THRESHOLD = 8;
-
 // Swipe gesture tuning
 export const SWIPE_DISMISS_PX = 120;
 export const SWIPE_DISMISS_VELOCITY = 0.5; // px/ms
