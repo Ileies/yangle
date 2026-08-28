@@ -291,7 +291,10 @@ reach the swipe deck.
       against existing **unresolved-cluster** hashes in the album — cheap enough at album scale
       (hundreds, not millions, of photos) to not need a background job for the MVP. Union-find
       (not naive pairwise grouping) merges clusters when a new photo matches two previously-
-      separate ones.
+      separate ones. Note: this is O(n) per uploaded photo against the unresolved set, so a
+      single batch upload of N files does O(n²) work in N — fine at hundreds of photos/album,
+      revisit (background job, or an indexed approximate-match structure) if albums start
+      regularly growing past roughly a thousand unresolved photos.
 - [x] **Bracket data structure**: a cluster of N unresolved photos becomes a single-elimination
       bracket, computed client-side from the cluster's photo list — no new DB table, the
       bracket's _current_ state is fully derivable from which photos still have
