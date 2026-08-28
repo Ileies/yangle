@@ -28,6 +28,7 @@ export const load: PageServerLoad = async ({ params, locals }) => {
 	const toDeckPhoto = (photo: (typeof resolved)[number]): DeckPhoto => ({
 		id: photo.id,
 		contentHash: photo.contentHash,
+		perceptualHash: photo.perceptualHash ?? '',
 		displayName: photo.displayName,
 		width: photo.width,
 		height: photo.height,

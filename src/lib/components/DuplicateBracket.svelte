@@ -4,6 +4,7 @@
 	import { SvelteMap } from 'svelte/reactivity';
 	import type { DeckPhoto } from '$lib/types';
 	import { clamp } from '$lib/utils';
+	import { pairDuplicatesBySimilarity } from '$lib/duplicatePairing';
 	import { photoUrl } from '$lib/photoUrls';
 
 	// Single-elimination bracket over a burst-shot cluster (TODO.md 3.4). The bracket's state
@@ -23,9 +24,8 @@
 		onAllResolved: () => void;
 	} = $props();
 
-	// Group by duplicateGroupId, preserving upload order within each group - burst shots are
-	// usually already adjacent in upload order, so round-1 pairing naturally pits genuinely
-	// similar-looking shots against each other first.
+	// Group by duplicateGroupId. Pairing within each round is based on measured visual distance,
+	// not incidental upload order.
 	const clusters: DeckPhoto[][] = (() => {
 		const byGroup = new SvelteMap<number, DeckPhoto[]>();
 		for (const photo of photos) {
@@ -60,7 +60,7 @@
 			if (members[0]) void resolveSurvivor(members[0]);
 			return;
 		}
-		roundContestants = [...members];
+		roundContestants = pairDuplicatesBySimilarity(members);
 		roundWinners = [];
 		pairIdx = 0;
 		roundNumber = 1;
@@ -81,7 +81,7 @@
 			if (survivor) void resolveSurvivor(survivor);
 			return;
 		}
-		roundContestants = roundWinners;
+		roundContestants = pairDuplicatesBySimilarity(roundWinners);
 		roundWinners = [];
 		pairIdx = 0;
 		roundNumber++;

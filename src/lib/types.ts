@@ -68,6 +68,7 @@ export type AlbumWithCover = Album & { coverPhotos: PhotoUrlRef[] };
 export type DeckPhoto = {
 	id: number;
 	contentHash: string;
+	perceptualHash: string;
 	displayName: string;
 	width: number;
 	height: number;
