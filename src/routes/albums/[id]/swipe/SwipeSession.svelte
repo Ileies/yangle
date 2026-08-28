@@ -42,7 +42,8 @@
 	}
 
 	$effect(() => {
-		yangle.activeSwipeAlbumId = deck.current || clustersPending ? data.album.id : null;
+		const hasActiveSwipeWork = deck.current || clustersPending;
+		yangle.activeSwipeAlbumId = hasActiveSwipeWork ? data.album.id : null;
 	});
 
 	onMount(() => {
