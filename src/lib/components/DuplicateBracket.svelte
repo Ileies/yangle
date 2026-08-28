@@ -160,9 +160,9 @@
 
 	onMount(() => startCluster(0));
 
-	// Draggable S-curve divider. Dragging past 65%/35% picks a side; releasing in the dead
-	// zone springs back to center without a decision. Tap-to-pick buttons below each photo are
-	// the non-drag fallback (3.4's explicit accessibility requirement).
+	// Draggable S-curve divider for comparing the photos. Choosing a winner is deliberately
+	// limited to the buttons below so a tap or click intended to move the divider cannot resolve
+	// the pairing accidentally.
 	let dragPercent = $state(50);
 	let dragging = $state(false);
 	let containerEl: HTMLDivElement | undefined = $state();
@@ -184,11 +184,6 @@
 	}
 	function onPointerUp(): void {
 		dragging = false;
-		if (!currentPair) return;
-		const [left, right] = currentPair;
-		if (dragPercent < 35) void resolvePair(right, left);
-		else if (dragPercent > 65) void resolvePair(left, right);
-		else dragPercent = 50;
 	}
 
 	let containerWidth = $state(0);
@@ -208,7 +203,7 @@
 		<p class="text-center text-sm text-base-content/60">
 			Round {roundNumber} of {totalRounds} &middot; burst {clusterIdx + 1} of {clusters.length}
 		</p>
-		<p class="text-center text-sm">Drag the divider toward the one you want to discard</p>
+		<p class="text-center text-sm">Drag the divider to compare, then choose below</p>
 
 		<div
 			bind:this={containerEl}
