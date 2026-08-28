@@ -12,7 +12,7 @@ const CONTENT_TYPES: Record<string, string> = {
 	preview: 'image/webp'
 };
 
-export const GET: RequestHandler = async ({ params, locals }) => {
+export const GET: RequestHandler = async ({ params, locals, url }) => {
 	if (!locals.user) error(401, 'Not logged in');
 
 	const photoId = Number(params.id);
@@ -38,7 +38,10 @@ export const GET: RequestHandler = async ({ params, locals }) => {
 	return new Response(file, {
 		headers: {
 			'Content-Type': CONTENT_TYPES[params.size] ?? file.type,
-			'Cache-Control': 'private, max-age=31536000, immutable'
+			'Cache-Control':
+				url.searchParams.get('v') === photo.contentHash
+					? 'private, max-age=31536000, immutable'
+					: 'private, no-cache'
 		}
 	});
 };

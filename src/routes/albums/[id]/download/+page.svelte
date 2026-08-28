@@ -2,6 +2,7 @@
 	import { resolve } from '$app/paths';
 	import { ArrowLeft, Download } from '@lucide/svelte';
 	import { DecisionStatus } from '$lib/types';
+	import { photoUrl } from '$lib/photoUrls';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -55,7 +56,7 @@
 			{#each data.entries as entry (entry.photo.id)}
 				<li class="flex items-center gap-3 rounded bg-base-200 p-2">
 					<img
-						src="/photos/{entry.photo.id}/thumbnail"
+						src={photoUrl(entry.photo, 'thumbnail')}
 						alt={entry.photo.displayName}
 						class="size-12 shrink-0 rounded object-cover"
 					/>

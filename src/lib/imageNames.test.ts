@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { flattenImageName, uniqueImageName } from './imageNames';
+import { compareImageNames, flattenImageName, uniqueImageName } from './imageNames';
 
 describe('flattenImageName', () => {
 	test('removes Unix and Windows directory paths', () => {
@@ -22,5 +22,26 @@ describe('uniqueImageName', () => {
 		const used = new Set(Array.from({ length: 1000 }, (_, i) => `photo${i ? `_${i}` : ''}.jpg`));
 		expect(uniqueImageName('photo.jpg', used)).toBe('photo_999_1.jpg');
 		expect(uniqueImageName('photo_1000.jpg', new Set(['photo_1000.jpg']))).toBe('photo_1000_1.jpg');
+	});
+});
+
+describe('compareImageNames', () => {
+	test('ignores legacy directory prefixes when ordering a camera roll', () => {
+		const names = [
+			'beach/IMG_20260810_193501.jpg',
+			'IMG_20260805_171659.jpg',
+			'beach/keep/IMG_20260810_193457.jpg'
+		];
+		expect(names.sort(compareImageNames)).toEqual([
+			'IMG_20260805_171659.jpg',
+			'beach/keep/IMG_20260810_193457.jpg',
+			'beach/IMG_20260810_193501.jpg'
+		]);
+	});
+
+	test('sorts numeric filename portions naturally', () => {
+		expect(['IMG_10.jpg', 'IMG_2.jpg', 'IMG_1.jpg', 'IMG_2_1.jpg'].sort(compareImageNames)).toEqual(
+			['IMG_1.jpg', 'IMG_2.jpg', 'IMG_2_1.jpg', 'IMG_10.jpg']
+		);
 	});
 });

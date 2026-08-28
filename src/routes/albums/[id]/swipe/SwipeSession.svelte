@@ -11,6 +11,7 @@
 	import { yangle } from '$lib/state.svelte';
 	import { postDecisions, SwipeDeck } from '$lib/swipeDeck.svelte';
 	import { DecisionStatus } from '$lib/types';
+	import { photoUrl } from '$lib/photoUrls';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -30,11 +31,11 @@
 	let rotateHintTimeout: ReturnType<typeof setTimeout> | undefined;
 	let skipInitialOrientationEffect = true;
 
-	function previewUrl(id: number): string {
-		return `/photos/${id}/preview`;
+	function previewUrl(photo: (typeof data.queue)[number]): string {
+		return photoUrl(photo, 'preview');
 	}
-	function thumbnailUrl(id: number): string {
-		return `/photos/${id}/thumbnail`;
+	function thumbnailUrl(photo: (typeof data.queue)[number]): string {
+		return photoUrl(photo, 'thumbnail');
 	}
 
 	function onEliminate(photo: (typeof data.clusters)[number]): void {
@@ -87,8 +88,8 @@
 		const current = deck.current;
 		if (!current) return;
 		void prefetch.focus(
-			{ id: current.id, url: previewUrl(current.id) },
-			deck.upcoming.map((p) => ({ id: p.id, url: previewUrl(p.id) }))
+			{ id: current.id, url: previewUrl(current) },
+			deck.upcoming.map((photo) => ({ id: photo.id, url: previewUrl(photo) }))
 		);
 	});
 
@@ -146,14 +147,14 @@
 				<div class="absolute inset-0" style:z-index={10 - i}>
 					<SwipeCard
 						displayName={photo.displayName}
-						previewUrl={previewUrl(photo.id)}
-						thumbnailUrl={thumbnailUrl(photo.id)}
+						previewUrl={previewUrl(photo)}
+						thumbnailUrl={thumbnailUrl(photo)}
 						active={i === 0}
 						previewReady={prefetch.isReady(photo.id)}
 						previewFailed={prefetch.hasFailed(photo.id)}
 						{reducedMotion}
 						onDecide={(status) => deck.decide(status)}
-						onRetry={() => prefetch.retry({ id: photo.id, url: previewUrl(photo.id) })}
+						onRetry={() => prefetch.retry({ id: photo.id, url: previewUrl(photo) })}
 						onDraggingChange={(value) => (activeCardDragging = value)}
 					/>
 				</div>

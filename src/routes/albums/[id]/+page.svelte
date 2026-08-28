@@ -15,6 +15,7 @@
 		X
 	} from '@lucide/svelte';
 	import PhotoViewer from '$lib/components/PhotoViewer.svelte';
+	import { photoUrl } from '$lib/photoUrls';
 	import { AlbumRole, DecisionMode, DecisionStatus, type Photo } from '$lib/types';
 	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 	import type { PageData } from './$types';
@@ -234,7 +235,7 @@
 				>
 					<div class="relative">
 						<img
-							src="/photos/{photo.id}/thumbnail"
+							src={photoUrl(photo, 'thumbnail')}
 							alt={photo.displayName}
 							loading="lazy"
 							class="aspect-square w-full rounded object-cover"

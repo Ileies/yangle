@@ -12,6 +12,7 @@
 	} from '@lucide/svelte';
 	import { SvelteMap } from 'svelte/reactivity';
 	import { formatBytes } from '$lib/utils';
+	import { photoUrl } from '$lib/photoUrls';
 	import { DecisionStatus, type Photo } from '$lib/types';
 
 	let {
@@ -268,7 +269,7 @@
 				onpointercancel={onPointerUp}
 			>
 				<img
-					src="/photos/{photo.id}/preview"
+					src={photoUrl(photo, 'preview')}
 					alt={photo.displayName}
 					class="max-h-full max-w-full object-contain select-none"
 					style="transform: translate({translateX}px, {translateY}px) scale({scale}); transition: {panStart ||
@@ -356,10 +357,9 @@
 						</button>
 					{/if}
 					<a
-						href={resolve('/photos/[id]/[size]', {
-							id: String(photo.id),
-							size: 'original'
-						})}
+						href={resolve(
+							`/photos/${photo.id}/original?v=${encodeURIComponent(photo.contentHash)}`
+						)}
 						download={photo.displayName}
 						class="btn btn-square btn-sm btn-outline"
 						title="Download"

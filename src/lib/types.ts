@@ -59,12 +59,15 @@ export type AlbumShare = {
 
 // Album plus its earliest-uploaded photos (up to 3), used wherever albums are listed as
 // cards (profile, /albums) - a "spread on a table" stack. Empty for albums with no photos.
-export type AlbumWithCover = Album & { coverPhotoIds: number[] };
+export type PhotoUrlRef = { id: number; contentHash: string };
+
+export type AlbumWithCover = Album & { coverPhotos: PhotoUrlRef[] };
 
 // Lean wire payload for the swipe deck (see TODO.md 3.0) - never the full DB row shape, kept
 // small since an album's whole undecided queue ships down in one `load` call.
 export type DeckPhoto = {
 	id: number;
+	contentHash: string;
 	displayName: string;
 	width: number;
 	height: number;

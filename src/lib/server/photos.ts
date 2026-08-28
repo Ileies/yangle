@@ -6,6 +6,7 @@ import { hammingDistance } from '$lib/utils';
 import { deleteStoredFiles } from './storage';
 import type { StoredImage } from './storage';
 import type { Photo } from '$lib/types';
+import { compareImageNames } from '$lib/imageNames';
 
 // Of these content hashes, which ones already exist in the album - keyed by hash so the
 // upload flow can skip re-sending bytes it already has and instead surface a name conflict.
@@ -91,10 +92,8 @@ export async function getPhotosInAlbum(albumId: number, photoIds: number[]): Pro
 }
 
 export async function listPhotos(albumId: number): Promise<Photo[]> {
-	return db.query.photos.findMany({
-		where: eq(photos.albumId, albumId),
-		orderBy: (photo, { asc }) => asc(photo.displayName)
-	});
+	const rows = await db.query.photos.findMany({ where: eq(photos.albumId, albumId) });
+	return rows.sort((a, b) => compareImageNames(a.displayName, b.displayName) || a.id - b.id);
 }
 
 export async function listPhotoNames(albumId: number): Promise<string[]> {

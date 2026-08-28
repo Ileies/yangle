@@ -3,6 +3,7 @@
 	import { ArrowLeft, Check, Heart, Trash2 } from '@lucide/svelte';
 	import { resolve } from '$app/paths';
 	import { DecisionStatus } from '$lib/types';
+	import { photoUrl } from '$lib/photoUrls';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -65,7 +66,7 @@
 			{#each remaining as entry (entry.photo.id)}
 				<li class="flex flex-col gap-3 rounded-2xl bg-base-200 p-3">
 					<img
-						src="/photos/{entry.photo.id}/preview"
+						src={photoUrl(entry.photo, 'preview')}
 						alt={entry.photo.displayName}
 						class="max-h-72 w-full rounded-lg object-contain"
 					/>

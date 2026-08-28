@@ -4,6 +4,7 @@
 	import { SvelteMap } from 'svelte/reactivity';
 	import type { DeckPhoto } from '$lib/types';
 	import { clamp } from '$lib/utils';
+	import { photoUrl } from '$lib/photoUrls';
 
 	// Single-elimination bracket over a burst-shot cluster (TODO.md 3.4). The bracket's state
 	// (round, pairing, byes) is entirely computed client-side from the still-unresolved cluster
@@ -222,13 +223,13 @@
 			tabindex="0"
 		>
 			<img
-				src="/photos/{left.id}/preview"
+				src={photoUrl(left, 'preview')}
 				alt={left.displayName}
 				class="absolute inset-0 h-full w-full object-cover select-none"
 				draggable="false"
 			/>
 			<img
-				src="/photos/{right.id}/preview"
+				src={photoUrl(right, 'preview')}
 				alt={right.displayName}
 				class="absolute inset-0 h-full w-full object-cover select-none"
 				style:clip-path={clipPath}

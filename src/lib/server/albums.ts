@@ -24,21 +24,23 @@ function spreadSample<T>(items: T[], count: number): T[] {
 // Up to 3 photos per album, spread across its upload timeline, used for the "spread on a
 // table" cover stack wherever albums are listed as cards. Returns a Map so callers can
 // look up by album id in O(1).
-async function coverPhotosFor(albumIds: number[]): Promise<Map<number, number[]>> {
+async function coverPhotosFor(
+	albumIds: number[]
+): Promise<Map<number, { id: number; contentHash: string }[]>> {
 	if (albumIds.length === 0) return new Map();
 	const rows = await db.query.photos.findMany({
 		where: inArray(photos.albumId, albumIds),
 		orderBy: (photo, { asc }) => asc(photo.uploadedAt)
 	});
-	const byAlbum = new Map<number, number[]>();
+	const byAlbum = new Map<number, { id: number; contentHash: string }[]>();
 	for (const row of rows) {
-		const ids = byAlbum.get(row.albumId) ?? [];
-		ids.push(row.id);
-		byAlbum.set(row.albumId, ids);
+		const albumPhotos = byAlbum.get(row.albumId) ?? [];
+		albumPhotos.push({ id: row.id, contentHash: row.contentHash });
+		byAlbum.set(row.albumId, albumPhotos);
 	}
-	const covers = new Map<number, number[]>();
-	for (const [albumId, ids] of byAlbum) {
-		covers.set(albumId, spreadSample(ids, COVER_PHOTOS_PER_ALBUM));
+	const covers = new Map<number, { id: number; contentHash: string }[]>();
+	for (const [albumId, albumPhotos] of byAlbum) {
+		covers.set(albumId, spreadSample(albumPhotos, COVER_PHOTOS_PER_ALBUM));
 	}
 	return covers;
 }
@@ -61,7 +63,7 @@ export async function listAlbumsFor(
 	const covers = await coverPhotosFor([...owned, ...shared].map((album) => album.id));
 	const withCover = (album: (typeof owned)[number]): AlbumWithCover => ({
 		...album,
-		coverPhotoIds: covers.get(album.id) ?? []
+		coverPhotos: covers.get(album.id) ?? []
 	});
 	return { owned: owned.map(withCover), shared: shared.map(withCover) };
 }

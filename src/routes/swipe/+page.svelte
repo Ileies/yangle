@@ -2,6 +2,7 @@
 	import { resolve } from '$app/paths';
 	import type { AlbumWithCover } from '$lib/types';
 	import { photoStackPlacements } from '$lib/utils';
+	import { photoUrl } from '$lib/photoUrls';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -12,7 +13,7 @@
 {#snippet albumCard(album: AlbumWithCover)}
 	<a href={resolve('/albums/[id]/swipe', { id: String(album.id) })} class="group block">
 		<div class="relative aspect-square w-full overflow-hidden rounded-xl bg-base-200">
-			{#if album.coverPhotoIds.length === 0}
+			{#if album.coverPhotos.length === 0}
 				<div class="flex h-full w-full items-center justify-center text-base-content/30">
 					<svg
 						xmlns="http://www.w3.org/2000/svg"
@@ -28,14 +29,14 @@
 					</svg>
 				</div>
 			{:else}
-				{#each album.coverPhotoIds as photoId, i (photoId)}
-					{@const p = photoStackPlacements(album.coverPhotoIds.length)[i]}
+				{#each album.coverPhotos as photo, i (photo.id)}
+					{@const p = photoStackPlacements(album.coverPhotos.length)[i]}
 					<div
 						class="absolute aspect-square overflow-hidden rounded-lg shadow-md"
 						style="left: {p.left}%; top: {p.top}%; width: {p.width}%; z-index: {i}; transform: translate(-50%, -50%) rotate({p.rotate}deg)"
 					>
 						<img
-							src="/photos/{photoId}/thumbnail"
+							src={photoUrl(photo, 'thumbnail')}
 							alt=""
 							loading="lazy"
 							class="h-full w-full object-cover"

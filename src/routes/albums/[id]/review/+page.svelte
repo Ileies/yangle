@@ -4,6 +4,7 @@
 	import { resolve } from '$app/paths';
 	import { SvelteMap } from 'svelte/reactivity';
 	import PhotoViewer from '$lib/components/PhotoViewer.svelte';
+	import { photoUrl } from '$lib/photoUrls';
 	import { DecisionStatus, type Photo } from '$lib/types';
 	import type { PageData } from './$types';
 
@@ -152,7 +153,7 @@
 			{#each visible as entry, i (entry.photo.id)}
 				<button type="button" class="relative" onclick={() => (openIndex = i)}>
 					<img
-						src="/photos/{entry.photo.id}/thumbnail"
+						src={photoUrl(entry.photo, 'thumbnail')}
 						alt={entry.photo.displayName}
 						loading="lazy"
 						class="aspect-square w-full rounded object-cover"
