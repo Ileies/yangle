@@ -1,6 +1,6 @@
 import { db } from './db';
 import { decisions } from './db/schema';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { DecisionStatus } from '$lib/types';
 
 export type DecisionInput = { photoId: number; status: DecisionStatus };
@@ -10,15 +10,20 @@ export type DecisionInput = { photoId: number; status: DecisionStatus };
 // durable review-list undo (Section 4) just callers of the same write path.
 export async function applyDecisions(email: string, inputs: DecisionInput[]): Promise<void> {
 	if (inputs.length === 0) return;
-	for (const input of inputs) {
-		await db
-			.insert(decisions)
-			.values({ photoId: input.photoId, email, status: input.status, decidedAt: Date.now() })
-			.onConflictDoUpdate({
-				target: [decisions.photoId, decisions.email],
-				set: { status: input.status, decidedAt: Date.now() }
-			});
-	}
+	await db
+		.insert(decisions)
+		.values(
+			inputs.map((input) => ({
+				photoId: input.photoId,
+				email,
+				status: input.status,
+				decidedAt: Date.now()
+			}))
+		)
+		.onConflictDoUpdate({
+			target: [decisions.photoId, decisions.email],
+			set: { status: sql`excluded.status`, decidedAt: sql`excluded.decided_at` }
+		});
 }
 
 // The "final joint call" for a `decisionMode: together` album (Section 5) - writes the same
