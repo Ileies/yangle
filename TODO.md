@@ -607,37 +607,91 @@ test matrices - those need an actual phone in hand, not curl.
 
 ## 4. Decisions, undo, and the review list
 
-- [ ] Swipe writes/updates the `decisions` row for `(photoId, currentUser)` — upsert, not
+- [x] Swipe writes/updates the `decisions` row for `(photoId, currentUser)` — upsert, not
       insert, so re-deciding a photo is just a normal update. The swipe deck's own optimistic
       batched-write path (3.0) and in-deck undo (3.6) are both just callers of this same
       upsert — this section is about the persistent semantics, not a separate mechanism.
-- [ ] `/albums/[id]/review` — a grid/list view of all photos grouped by current decision
+- [x] `/albums/[id]/review` — a grid/list view of all photos grouped by current decision
       (deleted / kept / favorited / undecided), with tap-to-flip so any prior decision (including
       duplicate-bracket losers) can be changed after the fact. This is the durable, cross-session
       undo — 3.6's in-deck undo is a same-session convenience layered on top of it, not a
       replacement for it.
 
+Implementation note: `applyDecisions`/`getDecisionsFor` (`decisions.ts`) already had the upsert
+semantics this section needed - no new server logic beyond the read-side grouping in the review
+page's load function. Verified live against the running dev server (album id 2, photos 25-29):
+loaded `/albums/2/review`, confirmed all 5 photos render grouped correctly by their actual
+`decisions` rows (keep/delete/favorite/undecided), flipped photo 26 from `delete` to `keep`
+through the page's own decision endpoint, confirmed the DB row updated, then flipped it back.
+Both the album page ("Review" button) and the swipe deck's end-of-session screen ("Review
+decisions" button) now link here. Not yet built: any visual diff beyond the badge/filter view
+(e.g. before/after comparison) - not asked for by this section's scope.
+
 ---
 
 ## 5. Sharing & permissions
 
-- [ ] Invite flow: share album by email (creates `album_shares` row) or shareable link
-- [ ] Roles: `contributor` (can add photos) vs `viewer` (can only decide)
-- [ ] Album management: owner can delete an album (cascades `photos`/`decisions`/etc. via FK
+- [x] Invite flow: share album by email (creates `album_shares` row) or shareable link
+- [x] Roles: `contributor` (can add photos) vs `viewer` (can only decide)
+- [x] Album management: owner can delete an album (cascades `photos`/`decisions`/etc. via FK
       `onDelete: cascade` — already modeled in the schema; still needs the disk files under
       `storage/` cleaned up, since those aren't tracked by the DB's cascade) and revoke a
       specific share (deletes the `album_shares` row; that user's existing `decisions` rows are
       left alone so access can be re-granted later without losing their prior swipes)
-- [ ] `decisionMode: independent` — each sharer has their own `decisions` rows, no
+- [x] `decisionMode: independent` — each sharer has their own `decisions` rows, no
       coordination; a later "merge view" can show where two people agree, but this needs no
       new mechanism, it's a read-only diff query over the existing table.
-- [ ] `decisionMode: together`, two `resolveMode`s:
-  - **`swipe-all-then-resolve`** (build this one first — no realtime infra needed): both
-    people swipe the whole album independently, then a conflict screen shows only the photos
-    where their `decisions.status` differs, for a final joint call
-  - **`live`** (Phase 2+): as soon as person A swipes a photo, it's removed from person B's
-    live queue via Server-Sent Events (SSE is enough here — one-directional server→client
-    push, no need for full WebSockets/a realtime service)
+- [x] `decisionMode: together`, two `resolveMode`s:
+  - [x] **`swipe-all-then-resolve`** (build this one first — no realtime infra needed): both
+        people swipe the whole album independently, then a conflict screen shows only the photos
+        where their `decisions.status` differs, for a final joint call
+  - [ ] **`live`** (Phase 2+): as soon as person A swipes a photo, it's removed from person B's
+        live queue via Server-Sent Events (SSE is enough here — one-directional server→client
+        push, no need for full WebSockets/a realtime service)
+
+Implementation notes:
+
+- New `server/albums.ts` functions: `listShares`/`listParticipants`, `addOrUpdateShare`/
+  `removeShare`, `setInviteLink`/`revokeInviteLink`/`getAlbumByInviteToken`/`acceptInvite`,
+  `updateDecisionSettings`, `deleteAlbum`. New `server/conflicts.ts`: `listConflicts` (the
+  swipe-all-then-resolve query — a photo qualifies only once every participant has a real,
+  non-`Undecided` decision and they don't all agree). `decisions.ts` gained
+  `applyDecisionToAll` for the joint-resolution write (one pick overwrites every participant's
+  row for that photo, which is what makes it stop showing up as a conflict).
+- Routes: `/albums/[id]/settings` (owner-only: shares list, email invite, shareable link,
+  decision-mode radio, delete-album danger zone), `/invite/[token]` (accept flow),
+  `/albums/[id]/resolve` (conflict screen for `together` mode). API endpoints split across
+  `shares/`, `invite-link/`, `decision-mode/`, `delete/`, `resolve/apply/` — deliberately never
+  co-located with a `+page.svelte` in the same directory (see bug below).
+- Login gained a `redirectTo` query param (validated same-origin-path-only, carried through the
+  `magic_links` row across the email round-trip) so `/invite/[token]` can send an unauthenticated
+  visitor to sign in and land right back on the invite instead of on `/`.
+- **Real bug found and fixed while wiring this up, not just this section's new routes**: SQLite
+  foreign keys were never enforced (`PRAGMA foreign_keys` was `0`) — every `onDelete: cascade`
+  in `schema.ts` was silently a no-op. Fixed in `db/index.ts` by opening the `bun:sqlite`
+  connection explicitly and enabling the pragma. Verified via `PRAGMA foreign_key_check` (no
+  existing violations) and by deleting a throwaway album with a share row and confirming both
+  the album and the share row were gone afterward, not just the album.
+- **Second bug, also pre-existing (not introduced by this section) and also fixed**: a route
+  directory that has both a `+page.svelte`/`+page.server.ts` and a `+server.ts` gets ALL HTTP
+  methods captured by `+server.ts` — a `+server.ts` that only exports `POST` makes `GET` to that
+  same path 405 instead of falling through to the page. This silently broke
+  `/albums/[id]/upload` (pre-existing, from Section 2) and would have broken my own
+  `/invite/[token]`, `/albums/[id]/resolve`, and the main `/albums/[id]` page (the last one from
+  the delete/decision-mode endpoints I initially put directly in `+server.ts` there). Fixed by
+  moving every such endpoint to its own subpath (`upload/submit`, `invite/[token]/accept`,
+  `resolve/apply`, `decision-mode`, `delete`) so no directory mixes page and API routes for
+  overlapping methods. Caught by testing actual `GET` requests against the running dev server,
+  not by type-checking or lint — this class of bug is invisible to both.
+- Verified live: share-by-email (including inviting an address that had never signed in before –
+  needs a placeholder `users` row created first, now handled in `addOrUpdateShare`), shareable
+  link generation + accept, decision-mode switch to `together`, a real 3-way conflict (owner
+  keep, one sharer delete, one sharer keep) showing up on `/resolve`, joint resolution
+  overwriting all three participants' `decisions` rows and the conflict disappearing afterward,
+  and album deletion cascading `album_shares` correctly.
+- Not built: `live` resolveMode (explicitly Phase 2+, needs SSE infra not otherwise in this app
+  yet) and the "merge view" mentioned for `independent` mode (explicitly called out in the plan
+  as needing no new mechanism — a nice-to-have, not asked for by this pass).
 
 ---
 
