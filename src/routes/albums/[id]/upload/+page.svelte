@@ -2,6 +2,7 @@
 	import { resolve } from '$app/paths';
 	import { ArrowLeft, Check, ChevronDown, FolderUp, X } from '@lucide/svelte';
 	import { sha256Hex } from '$lib/utils';
+	import { flattenImageName } from '$lib/imageNames';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -86,6 +87,7 @@
 		totalBytes = 0;
 
 		try {
+			const names = files.map((file) => flattenImageName(file.name));
 			const hashes = await Promise.all(files.map((file) => file.arrayBuffer().then(sha256Hex)));
 
 			const checkResponse = await fetch(`/albums/${data.album.id}/upload/check`, {
@@ -104,10 +106,10 @@
 				const match = existingByHash.get(hashes[i]);
 				if (!match) {
 					toUpload.push(files[i]);
-				} else if (match.displayName.split('/').pop() === files[i].name) {
+				} else if (flattenImageName(match.displayName) === names[i]) {
 					skippedCount++;
 					logEntries.push({
-						name: files[i].name,
+						name: names[i],
 						status: 'skipped',
 						detail: 'Already in this album'
 					});
@@ -115,7 +117,7 @@
 					conflicts.push({
 						photoId: match.id,
 						existingName: match.displayName,
-						newName: files[i].name
+						newName: names[i]
 					});
 				}
 			}
@@ -125,16 +127,16 @@
 				totalBytes = toUpload.reduce((sum, file) => sum + file.size, 0);
 
 				for (const file of toUpload) {
-					currentFileName = file.name;
+					currentFileName = flattenImageName(file.name);
 					const bytesBefore = uploadedBytes;
 					try {
-						await uploadSingleFile(data.album.id, file, (loaded) => {
+						const uploaded = await uploadSingleFile(data.album.id, file, (loaded) => {
 							uploadedBytes = bytesBefore + loaded;
 						});
 						uploadedBytes = bytesBefore + file.size;
 						addedCount++;
 						logEntries.push({
-							name: file.name,
+							name: uploaded.displayName,
 							status: 'success',
 							detail: 'Uploaded, thumbnail generated'
 						});
@@ -142,7 +144,7 @@
 						uploadedBytes = bytesBefore + file.size;
 						failedCount++;
 						logEntries.push({
-							name: file.name,
+							name: flattenImageName(file.name),
 							status: 'failed',
 							detail: err instanceof Error ? err.message : 'Upload failed.'
 						});

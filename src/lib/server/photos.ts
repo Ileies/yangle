@@ -97,6 +97,14 @@ export async function listPhotos(albumId: number): Promise<Photo[]> {
 	});
 }
 
+export async function listPhotoNames(albumId: number): Promise<string[]> {
+	const rows = await db.query.photos.findMany({
+		where: eq(photos.albumId, albumId),
+		columns: { displayName: true }
+	});
+	return rows.map((row) => row.displayName);
+}
+
 // Permanently removes the given photos (must belong to `albumId`, so a crafted id from another
 // album can't be deleted through here) - the DB rows plus every rendition on disk. Unlike a
 // decision status, this can't be undone.

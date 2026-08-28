@@ -1,6 +1,7 @@
 import { error, json } from '@sveltejs/kit';
 import { canContribute, getAlbumRole } from '$lib/server/albums';
-import { getPhoto, recordNameVariant, setDisplayName } from '$lib/server/photos';
+import { flattenImageName, uniqueImageName } from '$lib/imageNames';
+import { getPhoto, listPhotoNames, recordNameVariant, setDisplayName } from '$lib/server/photos';
 import type { RequestHandler } from './$types';
 
 // Resolves a name conflict surfaced by /upload/check: same content hash already in the
@@ -22,8 +23,15 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 	const photo = await getPhoto(photoId);
 	if (!photo || photo.albumId !== albumId) error(404, 'Photo not found');
 
-	await recordNameVariant(photoId, otherName);
-	if (keepName !== photo.displayName) await setDisplayName(photoId, keepName);
+	const flattenedKeepName = flattenImageName(keepName);
+	const flattenedOtherName = flattenImageName(otherName);
+	await recordNameVariant(photoId, flattenedOtherName);
+	if (flattenedKeepName !== photo.displayName) {
+		const usedNames = new Set(
+			(await listPhotoNames(albumId)).filter((name) => name !== photo.displayName)
+		);
+		await setDisplayName(photoId, uniqueImageName(flattenedKeepName, usedNames));
+	}
 
 	return json({ ok: true });
 };

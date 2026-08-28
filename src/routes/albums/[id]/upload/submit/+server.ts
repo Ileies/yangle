@@ -1,6 +1,7 @@
 import { error, json } from '@sveltejs/kit';
 import { canContribute, getAlbumRole } from '$lib/server/albums';
-import { clusterOnUpload, insertPhoto } from '$lib/server/photos';
+import { flattenImageName, uniqueImageName } from '$lib/imageNames';
+import { clusterOnUpload, insertPhoto, listPhotoNames } from '$lib/server/photos';
 import { storeUpload } from '$lib/server/storage';
 import type { RequestHandler } from './$types';
 
@@ -19,6 +20,7 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 
 	const added = [];
 	const failed: { name: string; error: string }[] = [];
+	const usedNames = new Set(await listPhotoNames(albumId));
 
 	// storeUpload (sharp encoding, EXIF/hash parsing) is CPU/IO-bound and independent per file,
 	// so it's safe to fan out within a bounded chunk. clusterOnUpload is NOT safe to run
@@ -38,7 +40,8 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 			chunk.map(async (file): Promise<StoreResult> => {
 				try {
 					const buffer = Buffer.from(await file.arrayBuffer());
-					const extensionHint = file.name.includes('.') ? file.name.split('.').pop()! : '';
+					const flattenedName = flattenImageName(file.name);
+					const extensionHint = flattenedName.includes('.') ? flattenedName.split('.').pop()! : '';
 					const stored = await storeUpload(buffer, extensionHint);
 					return { ok: true, file, stored };
 				} catch (err) {
@@ -53,12 +56,9 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 				continue;
 			}
 			try {
-				const photo = await insertPhoto(
-					albumId,
-					locals.user.email,
-					result.file.name,
-					result.stored
-				);
+				const displayName = uniqueImageName(result.file.name, usedNames);
+				const photo = await insertPhoto(albumId, locals.user.email, displayName, result.stored);
+				usedNames.add(displayName);
 				await clusterOnUpload(albumId, photo);
 				added.push({ id: photo.id, displayName: photo.displayName });
 			} catch (err) {
