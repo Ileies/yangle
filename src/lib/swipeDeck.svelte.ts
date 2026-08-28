@@ -99,7 +99,16 @@ export class SwipeDeck {
 
 		this.queue = this.queue.slice(1);
 		this.history.push({ photo, previousStatus, nextStatus: status });
-		if (this.history.length > HISTORY_LIMIT) this.history.shift();
+		if (this.history.length > HISTORY_LIMIT) {
+			// Once an entry ages out here, its photo can never be undone back into the queue
+			// (undo only ever pops the most recent entry), so #statusByPhoto no longer needs to
+			// answer for it either - evict in lockstep, unless another history entry for the
+			// same photo (e.g. redecided later) still needs it.
+			const evicted = this.history.shift();
+			if (evicted && !this.history.some((e) => e.photo.id === evicted.photo.id)) {
+				this.#statusByPhoto.delete(evicted.photo.id);
+			}
+		}
 
 		this.#enqueueWrite(photo.id, status);
 	}
