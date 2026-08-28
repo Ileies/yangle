@@ -104,7 +104,7 @@
 				const match = existingByHash.get(hashes[i]);
 				if (!match) {
 					toUpload.push(files[i]);
-				} else if (match.displayName === files[i].name) {
+				} else if (match.displayName.split('/').pop() === files[i].name) {
 					skippedCount++;
 					logEntries.push({
 						name: files[i].name,
