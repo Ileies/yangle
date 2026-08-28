@@ -1,14 +1,13 @@
 <script lang="ts">
+	import { resolve } from '$app/paths';
 	import {
-		Check,
 		ChevronLeft,
 		ChevronRight,
+		Download,
 		Eye,
 		EyeOff,
-		Heart,
 		Info,
 		Trash2,
-		Undo2,
 		X
 	} from '@lucide/svelte';
 	import { SvelteMap } from 'svelte/reactivity';
@@ -20,13 +19,15 @@
 		index = $bindable(),
 		onClose,
 		statuses,
-		onSetStatus
+		onSetStatus,
+		onDelete
 	}: {
 		photos: Photo[];
 		index: number;
 		onClose: () => void;
 		statuses?: Map<number, DecisionStatus>;
 		onSetStatus?: (photo: Photo, status: DecisionStatus) => void | Promise<void>;
+		onDelete?: (photo: Photo) => void | Promise<void>;
 	} = $props();
 
 	let dialogEl: HTMLDialogElement | undefined = $state();
@@ -55,6 +56,7 @@
 		photo && statuses ? (statuses.get(photo.id) ?? DecisionStatus.Undecided) : null
 	);
 	let canDecide = $derived(!!onSetStatus);
+	let canDelete = $derived(!!onDelete);
 
 	$effect(() => {
 		if (photo && dialogEl && !dialogEl.open) dialogEl.showModal();
@@ -208,6 +210,11 @@
 		await onSetStatus(photo, status);
 	}
 
+	async function deletePhoto() {
+		if (!photo || !onDelete) return;
+		await onDelete(photo);
+	}
+
 	const dateFormatter = new Intl.DateTimeFormat(undefined, {
 		dateStyle: 'medium',
 		timeStyle: 'short'
@@ -324,37 +331,42 @@
 			{/if}
 
 			{#if canDecide && showButtons}
-				<div class="grid grid-cols-4 gap-2 bg-base-100 p-3">
-					<button
-						type="button"
-						class="btn btn-sm {status === DecisionStatus.Keep ? 'btn-success' : 'btn-outline'}"
-						onclick={() => setStatus(DecisionStatus.Keep)}
+				<div class="flex gap-2 bg-base-100 p-3">
+					<label class="sr-only" for="photo-status">Photo category</label>
+					<select
+						id="photo-status"
+						class="select select-sm min-w-0 flex-1"
+						value={status ?? DecisionStatus.Undecided}
+						onchange={(event) => setStatus(event.currentTarget.value as DecisionStatus)}
 					>
-						<Check class="size-4" /> <span class="hidden sm:inline">Keep</span>
-					</button>
-					<button
-						type="button"
-						class="btn btn-sm {status === DecisionStatus.Favorite
-							? 'btn-secondary'
-							: 'btn-outline'}"
-						onclick={() => setStatus(DecisionStatus.Favorite)}
+						<option value={DecisionStatus.Undecided}>Undecided</option>
+						<option value={DecisionStatus.Keep}>Keep</option>
+						<option value={DecisionStatus.Favorite}>Favorite</option>
+						<option value={DecisionStatus.Delete}>Delete</option>
+					</select>
+					{#if canDelete}
+						<button
+							type="button"
+							class="btn btn-error btn-square btn-sm"
+							onclick={deletePhoto}
+							title="Delete permanently"
+							aria-label="Delete photo permanently"
+						>
+							<Trash2 class="size-4" />
+						</button>
+					{/if}
+					<a
+						href={resolve('/photos/[id]/[size]', {
+							id: String(photo.id),
+							size: 'original'
+						})}
+						download={photo.displayName}
+						class="btn btn-square btn-sm btn-outline"
+						title="Download"
+						aria-label="Download photo"
 					>
-						<Heart class="size-4" /> <span class="hidden sm:inline">Favorite</span>
-					</button>
-					<button
-						type="button"
-						class="btn btn-sm {status === DecisionStatus.Delete ? 'btn-error' : 'btn-outline'}"
-						onclick={() => setStatus(DecisionStatus.Delete)}
-					>
-						<Trash2 class="size-4" /> <span class="hidden sm:inline">Delete</span>
-					</button>
-					<button
-						type="button"
-						class="btn btn-sm {status === DecisionStatus.Undecided ? 'btn-neutral' : 'btn-outline'}"
-						onclick={() => setStatus(DecisionStatus.Undecided)}
-					>
-						<Undo2 class="size-4" /> <span class="hidden sm:inline">Undecided</span>
-					</button>
+						<Download class="size-4" />
+					</a>
 				</div>
 			{/if}
 		</div>

@@ -129,6 +129,22 @@
 			errorMessage = `Couldn't delete ${count} photo${count === 1 ? '' : 's'}.`;
 		}
 	}
+
+	async function deletePhoto(photo: Photo) {
+		if (!confirm(`Delete "${photo.displayName}" permanently? This can't be undone.`)) return;
+		try {
+			const res = await fetch(`/albums/${data.album.id}/photos`, {
+				method: 'DELETE',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify([photo.id])
+			});
+			if (!res.ok) throw new Error();
+			openIndex = null;
+			await invalidateAll();
+		} catch {
+			errorMessage = `Couldn't delete "${photo.displayName}".`;
+		}
+	}
 </script>
 
 <svelte:head>
@@ -307,5 +323,6 @@
 		onClose={() => (openIndex = null)}
 		{statuses}
 		onSetStatus={setStatus}
+		onDelete={data.canContribute ? deletePhoto : undefined}
 	/>
 {/if}

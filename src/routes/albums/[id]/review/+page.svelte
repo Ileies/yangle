@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { ArrowLeft, RotateCcw } from '@lucide/svelte';
+	import { invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { SvelteMap } from 'svelte/reactivity';
 	import PhotoViewer from '$lib/components/PhotoViewer.svelte';
@@ -72,6 +73,22 @@
 		} catch {
 			entries = previous;
 			errorMessage = `Couldn't reset decisions.`;
+		}
+	}
+
+	async function deletePhoto(photo: Photo): Promise<void> {
+		if (!confirm(`Delete "${photo.displayName}" permanently? This can't be undone.`)) return;
+		try {
+			const res = await fetch(`/albums/${data.album.id}/photos`, {
+				method: 'DELETE',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify([photo.id])
+			});
+			if (!res.ok) throw new Error();
+			openIndex = null;
+			await invalidateAll();
+		} catch {
+			errorMessage = `Couldn't delete "${photo.displayName}".`;
 		}
 	}
 
@@ -156,6 +173,7 @@
 		onClose={() => (openIndex = null)}
 		{statuses}
 		onSetStatus={setStatus}
+		onDelete={data.canContribute ? deletePhoto : undefined}
 	/>
 {/if}
 
