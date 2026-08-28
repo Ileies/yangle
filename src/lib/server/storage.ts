@@ -1,7 +1,8 @@
 import sharp from 'sharp';
 import exifr from 'exifr';
 import path from 'node:path';
-import { unlink } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
+import { rename, unlink } from 'node:fs/promises';
 import { STORAGE_DIR } from '$env/static/private';
 import { IMAGE_QUALITY, PREVIEW_MAX_PX, THUMBNAIL_MAX_PX } from '$lib/constants';
 import { Orientation } from '$lib/types';
@@ -54,6 +55,21 @@ export type StoredImage = {
 
 const HEIF_FORMATS = new Set(['heif', 'heic', 'avif']);
 
+// Writes to a temp path in the same directory as `destPath` (so the rename below stays on the
+// same filesystem, keeping it atomic) and renames into place once the write is fully complete.
+// Two concurrent uploads of identical bytes (same content hash) racing past the exists() check
+// below both end up writing their own temp file and renaming over the same destination - since
+// content hash guarantees the bytes are identical, whichever rename lands last "wins" harmlessly
+// instead of the two writers corrupting a shared destination file mid-write.
+async function writeAtomic(
+	destPath: string,
+	write: (tempPath: string) => Promise<unknown>
+): Promise<void> {
+	const tempPath = `${destPath}.tmp-${randomUUID()}`;
+	await write(tempPath);
+	await rename(tempPath, destPath);
+}
+
 // Writes the original plus a preview (swipe deck) and thumbnail (grids, duplicate-resolution
 // screen) size, both re-encoded as WebP. For HEIC/HEIF originals (the iPhone default), also
 // writes a JPEG compatibility copy via the same sharp/libvips pipeline - no separate ffmpeg
@@ -85,17 +101,23 @@ export async function storeUpload(buffer: Buffer, extensionHint: string): Promis
 		: null;
 
 	if (!(await Bun.file(storagePath(originalRelative)).exists())) {
-		await Bun.write(storagePath(originalRelative), buffer);
-		await sharp(buffer)
-			.resize(PREVIEW_MAX_PX, PREVIEW_MAX_PX, { fit: 'inside', withoutEnlargement: true })
-			.webp({ quality: IMAGE_QUALITY })
-			.toFile(storagePath(previewRelative));
-		await sharp(buffer)
-			.resize(THUMBNAIL_MAX_PX, THUMBNAIL_MAX_PX, { fit: 'inside', withoutEnlargement: true })
-			.webp({ quality: IMAGE_QUALITY })
-			.toFile(storagePath(thumbnailRelative));
+		await writeAtomic(storagePath(originalRelative), (tempPath) => Bun.write(tempPath, buffer));
+		await writeAtomic(storagePath(previewRelative), (tempPath) =>
+			sharp(buffer)
+				.resize(PREVIEW_MAX_PX, PREVIEW_MAX_PX, { fit: 'inside', withoutEnlargement: true })
+				.webp({ quality: IMAGE_QUALITY })
+				.toFile(tempPath)
+		);
+		await writeAtomic(storagePath(thumbnailRelative), (tempPath) =>
+			sharp(buffer)
+				.resize(THUMBNAIL_MAX_PX, THUMBNAIL_MAX_PX, { fit: 'inside', withoutEnlargement: true })
+				.webp({ quality: IMAGE_QUALITY })
+				.toFile(tempPath)
+		);
 		if (compatOriginalRelative) {
-			await sharp(buffer).jpeg({ quality: 92 }).toFile(storagePath(compatOriginalRelative));
+			await writeAtomic(storagePath(compatOriginalRelative), (tempPath) =>
+				sharp(buffer).jpeg({ quality: 92 }).toFile(tempPath)
+			);
 		}
 	}
 

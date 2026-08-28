@@ -49,14 +49,14 @@ export async function consumeMagicLink(token: string): Promise<ConsumedMagicLink
 		.set({ consumedAt: Date.now() })
 		.where(eq(magicLinks.token, link.token));
 
-	const existing = await db.query.users.findFirst({ where: eq(users.email, link.email) });
-	if (!existing) {
-		await db.insert(users).values({
+	await db
+		.insert(users)
+		.values({
 			email: link.email,
 			displayName: link.email.split('@')[0],
 			createdAt: Date.now()
-		});
-	}
+		})
+		.onConflictDoNothing();
 
 	const sessionToken = await createSession(link.email);
 	return { sessionToken, redirectTo: link.redirectTo };
@@ -74,13 +74,14 @@ export async function createSession(email: string): Promise<string> {
 }
 
 export async function getSessionUser(token: string): Promise<User | null> {
-	const session = await db.query.sessions.findFirst({
-		where: and(eq(sessions.token, token), gt(sessions.expiresAt, Date.now()))
-	});
-	if (!session) return null;
+	const row = await db
+		.select({ user: users })
+		.from(sessions)
+		.innerJoin(users, eq(sessions.email, users.email))
+		.where(and(eq(sessions.token, token), gt(sessions.expiresAt, Date.now())))
+		.get();
 
-	const user = await db.query.users.findFirst({ where: eq(users.email, session.email) });
-	return user ?? null;
+	return row?.user ?? null;
 }
 
 export async function destroySession(token: string): Promise<void> {
