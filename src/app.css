@@ -1,0 +1,16 @@
+@import 'tailwindcss';
+@plugin 'daisyui' {
+	themes:
+		light --default,
+		dark --prefersdark;
+}
+
+/* Mobile-first: avoid iOS rubber-band scroll and text-size adjust surprises */
+html {
+	-webkit-text-size-adjust: 100%;
+	overscroll-behavior-y: none;
+}
+
+body {
+	overscroll-behavior-y: none;
+}
