@@ -1,6 +1,6 @@
 import { error, json } from '@sveltejs/kit';
 import { z } from 'zod';
-import { getAlbumRole, updateDecisionSettings } from '$lib/server/albums';
+import { requireAlbumAccess, updateDecisionSettings } from '$lib/server/albums';
 import { AlbumRole, DecisionMode, ResolveMode } from '$lib/types';
 import type { RequestHandler } from './$types';
 
@@ -12,7 +12,7 @@ const settingsSchema = z.object({
 export const PATCH: RequestHandler = async ({ params, request, locals }) => {
 	if (!locals.user) error(401, 'Not signed in');
 	const albumId = Number(params.id);
-	const role = await getAlbumRole(albumId, locals.user.email);
+	const { role } = await requireAlbumAccess(albumId, locals.user.email);
 	if (role !== AlbumRole.Owner) error(403, 'Only the album owner can do this');
 
 	const body = settingsSchema.safeParse(await request.json());

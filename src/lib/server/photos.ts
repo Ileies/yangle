@@ -71,6 +71,25 @@ export async function getPhoto(photoId: number): Promise<Photo | null> {
 	return photo ?? null;
 }
 
+// Confirms `photoId` actually belongs to `albumId` before a route acts on it - guards against a
+// crafted/copy-pasted id from a different album being used to force a decision or resolution
+// onto photos/participants the caller has no business touching.
+export async function getPhotoInAlbum(albumId: number, photoId: number): Promise<Photo | null> {
+	const photo = await db.query.photos.findFirst({
+		where: and(eq(photos.albumId, albumId), eq(photos.id, photoId))
+	});
+	return photo ?? null;
+}
+
+// Batched version of getPhotoInAlbum, for validating every id in a decisions batch belongs to
+// the album before any of them are written - returns just the matching ids.
+export async function getPhotosInAlbum(albumId: number, photoIds: number[]): Promise<Photo[]> {
+	if (photoIds.length === 0) return [];
+	return db.query.photos.findMany({
+		where: and(eq(photos.albumId, albumId), inArray(photos.id, photoIds))
+	});
+}
+
 export async function listPhotos(albumId: number): Promise<Photo[]> {
 	return db.query.photos.findMany({
 		where: eq(photos.albumId, albumId),
@@ -157,7 +176,7 @@ export async function clusterOnUpload(albumId: number, newPhoto: Photo): Promise
 	if (existingGroupIds.length > 0) {
 		await db
 			.update(photos)
-			.set({ duplicateGroupId: canonicalGroupId })
+			.set({ duplicateGroupId: canonicalGroupId, duplicateResolved: false })
 			.where(and(eq(photos.albumId, albumId), inArray(photos.duplicateGroupId, existingGroupIds)));
 	}
 }

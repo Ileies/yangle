@@ -1,6 +1,7 @@
 import { db } from './db';
 import { albums, albumShares, photos, users } from './db/schema';
 import { and, eq, inArray } from 'drizzle-orm';
+import { error } from '@sveltejs/kit';
 import { randomToken } from '$lib/utils';
 import { AlbumRole, DecisionMode, ResolveMode } from '$lib/types';
 import type { Album, AlbumShare, AlbumWithCover } from '$lib/types';
@@ -81,6 +82,25 @@ export function canContribute(role: AlbumRole | null): boolean {
 	return role === AlbumRole.Owner || role === AlbumRole.Contributor;
 }
 
+// Shared "does this user have access" gate for every album-scoped route - fetches the album and
+// the caller's role in one place so every route gets consistent 404-for-bad-id/missing-album vs.
+// 403-for-no-access behavior instead of each repeating (and subtly diverging on) the same
+// boilerplate. Throws via SvelteKit's `error()`, so callers can just await it and use the result.
+export async function requireAlbumAccess(
+	albumId: number,
+	email: string
+): Promise<{ album: Album; role: AlbumRole }> {
+	if (!Number.isInteger(albumId)) error(404, 'Album not found');
+
+	const album = await db.query.albums.findFirst({ where: eq(albums.id, albumId) });
+	if (!album) error(404, 'Album not found');
+
+	const role = await getAlbumRole(albumId, email);
+	if (!role) error(403, 'No access to this album');
+
+	return { album, role };
+}
+
 export async function createAlbum(ownerEmail: string, name: string): Promise<Album> {
 	const [album] = await db
 		.insert(albums)
@@ -112,16 +132,20 @@ export async function addOrUpdateShare(
 	// `album_shares.email` has an FK on `users.email` - inviting someone who's never signed in
 	// needs a placeholder row first (same shape `consumeMagicLink` creates on first login; it
 	// just fills in for real once they actually verify a magic link).
-	const existingUser = await db.query.users.findFirst({ where: eq(users.email, email) });
+	const normalizedEmail = email.trim().toLowerCase();
+
+	const existingUser = await db.query.users.findFirst({ where: eq(users.email, normalizedEmail) });
 	if (!existingUser) {
-		await db
-			.insert(users)
-			.values({ email, displayName: email.split('@')[0], createdAt: Date.now() });
+		await db.insert(users).values({
+			email: normalizedEmail,
+			displayName: normalizedEmail.split('@')[0],
+			createdAt: Date.now()
+		});
 	}
 
 	await db
 		.insert(albumShares)
-		.values({ albumId, email, role, invitedAt: Date.now() })
+		.values({ albumId, email: normalizedEmail, role, invitedAt: Date.now() })
 		.onConflictDoUpdate({ target: [albumShares.albumId, albumShares.email], set: { role } });
 }
 

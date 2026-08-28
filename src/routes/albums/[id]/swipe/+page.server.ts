@@ -1,22 +1,15 @@
-import { error, redirect } from '@sveltejs/kit';
-import { canContribute, getAlbumRole } from '$lib/server/albums';
+import { redirect } from '@sveltejs/kit';
+import { canContribute, requireAlbumAccess } from '$lib/server/albums';
 import { getDecisionsFor } from '$lib/server/decisions';
-import { db } from '$lib/server/db';
-import { albums } from '$lib/server/db/schema';
 import { listPendingDuplicateClusters, listResolvedUndecided } from '$lib/server/photos';
 import { DecisionStatus, type DeckPhoto } from '$lib/types';
-import { eq } from 'drizzle-orm';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ params, locals }) => {
 	if (!locals.user) redirect(303, '/login');
 
 	const albumId = Number(params.id);
-	const album = await db.query.albums.findFirst({ where: eq(albums.id, albumId) });
-	if (!album) error(404, 'Album not found');
-
-	const role = await getAlbumRole(albumId, locals.user.email);
-	if (!role) error(403, 'No access to this album');
+	const { album, role } = await requireAlbumAccess(albumId, locals.user.email);
 
 	const [pendingCluster, resolved] = await Promise.all([
 		listPendingDuplicateClusters(albumId),
