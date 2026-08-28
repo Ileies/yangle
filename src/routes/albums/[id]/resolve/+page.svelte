@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { ArrowLeft, Check, Heart, Trash2 } from '@lucide/svelte';
 	import { resolve } from '$app/paths';
 	import { DecisionStatus } from '$lib/types';
@@ -6,7 +7,10 @@
 
 	let { data }: { data: PageData } = $props();
 
-	let remaining = $state([...data.conflicts]);
+	// Seeded once from the initial load, then owned locally as each conflict gets resolved -
+	// deliberately not reactive to `data.conflicts` changing (untrack silences the "you probably
+	// meant $derived" warning, which doesn't apply here since this list is meant to be mutated).
+	let remaining = $state(untrack(() => [...data.conflicts]));
 	let busy = $state(false);
 	let errorMessage: string | null = $state(null);
 

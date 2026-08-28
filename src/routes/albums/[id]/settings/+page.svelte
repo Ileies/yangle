@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { goto, invalidateAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
@@ -11,8 +12,13 @@
 	let inviteEmail = $state('');
 	let inviteRole: AlbumRole.Contributor | AlbumRole.Viewer = $state(AlbumRole.Contributor);
 	let linkRole: AlbumRole.Contributor | AlbumRole.Viewer = $state(AlbumRole.Viewer);
-	let decisionMode: DecisionMode = $state(data.album.decisionMode);
-	let resolveMode: ResolveMode = $state(data.album.resolveMode ?? ResolveMode.SwipeAllThenResolve);
+	// Seeded once from the loaded album, then a locally-editable form draft - deliberately not
+	// reactive to `data.album` changing (untrack silences the "you probably meant $derived"
+	// warning, which doesn't apply to editable form state).
+	let decisionMode: DecisionMode = $state(untrack(() => data.album.decisionMode));
+	let resolveMode: ResolveMode = $state(
+		untrack(() => data.album.resolveMode ?? ResolveMode.SwipeAllThenResolve)
+	);
 	let deleteConfirmText = $state('');
 	let errorMessage: string | null = $state(null);
 	let busy = $state(false);

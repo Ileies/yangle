@@ -97,7 +97,7 @@
 	}
 
 	$effect(() => {
-		orientation.isLandscape;
+		void orientation.isLandscape;
 		if (skipInitialOrientationEffect) {
 			skipInitialOrientationEffect = false;
 			return;
@@ -122,10 +122,7 @@
 {:else if deck.current}
 	<div class="flex min-h-full flex-col gap-3 p-3 pb-0">
 		<div>
-			<progress
-				class="progress progress-primary w-full"
-				value={deck.decidedCount}
-				max={deck.total}
+			<progress class="progress progress-primary w-full" value={deck.decidedCount} max={deck.total}
 			></progress>
 			<p class="text-center text-xs text-base-content/60">{deck.decidedCount} / {deck.total}</p>
 		</div>
