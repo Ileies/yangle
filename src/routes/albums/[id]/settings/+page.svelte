@@ -169,14 +169,16 @@
 			</ul>
 		{/if}
 
-		<div class="flex gap-2">
+		<div class="grid grid-cols-[minmax(0,1fr)_auto] gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto]">
 			<input
 				type="email"
-				placeholder="someone@example.com"
+				placeholder="Email address"
+				autocomplete="email"
+				aria-label="Collaborator email address"
 				bind:value={inviteEmail}
-				class="input input-bordered input-sm flex-1"
+				class="input input-bordered input-sm col-span-2 w-full min-w-0 sm:col-span-1"
 			/>
-			<select bind:value={inviteRole} class="select select-bordered select-sm">
+			<select bind:value={inviteRole} class="select select-bordered select-sm w-full min-w-0">
 				<option value={AlbumRole.Contributor}>Contributor</option>
 				<option value={AlbumRole.Viewer}>Viewer</option>
 			</select>
