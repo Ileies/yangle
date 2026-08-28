@@ -39,8 +39,6 @@
 
 	let root: HTMLDivElement | undefined = $state();
 
-	type Mode = 'idle' | 'swiping' | 'panning' | 'pinching';
-	let mode: Mode = $state('idle');
 	let card = $state({ x: 0, y: 0, scale: 1, rotate: 0, originX: 50, originY: 50 });
 	let flying = $state(false);
 	let dragging = $state(false);
@@ -107,12 +105,11 @@
 		const gesture = new Gesture(
 			root,
 			{
-				onDragStart: () => {
-					if (mode === 'pinching') return;
+				onDragStart: (state) => {
+					if (state.pinching) return;
 					directionLock = null;
 					dragging = true;
 					if (card.scale > 1) {
-						mode = 'panning';
 						panBase = { x: card.x, y: card.y };
 					}
 				},
@@ -126,7 +123,6 @@
 						return;
 					}
 
-					mode = 'swiping';
 					if (!directionLock && Math.hypot(mx, my) > 10) {
 						directionLock = Math.abs(mx) > Math.abs(my) ? 'horizontal' : 'vertical';
 					}
@@ -151,12 +147,10 @@
 						} else {
 							lastTapAt = now;
 						}
-						mode = 'idle';
 						return;
 					}
 
 					if (card.scale > 1) {
-						mode = 'idle';
 						directionLock = null;
 						return;
 					}
@@ -174,12 +168,10 @@
 					} else {
 						resetTransform();
 					}
-					mode = 'idle';
 					directionLock = null;
 				},
 				onPinchStart: (state) => {
 					if (!root) return;
-					mode = 'pinching';
 					const rect = root.getBoundingClientRect();
 					const [ox, oy] = state.origin;
 					card = {
@@ -194,7 +186,6 @@
 				},
 				onPinchEnd: () => {
 					card = { ...card, scale: clamp(card.scale, ZOOM_MIN_SCALE, ZOOM_MAX_SCALE) };
-					mode = 'idle';
 				}
 			},
 			{
