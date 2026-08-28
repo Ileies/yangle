@@ -48,6 +48,7 @@
 	let pinchStartDist = $state(0);
 	let pinchStartScale = 1;
 	let panStart: { x: number; y: number; tx: number; ty: number } | null = $state(null);
+	let swipeStart: { x: number; y: number } | null = $state(null);
 
 	let photo = $derived(photos[index]);
 	let status = $derived(
@@ -149,8 +150,12 @@
 			pinchStartDist = Math.hypot(a.x - b.x, a.y - b.y);
 			pinchStartScale = scale;
 			panStart = null;
+			swipeStart = null;
 		} else if (pointers.size === 1 && scale > 1) {
 			panStart = { x: e.clientX, y: e.clientY, tx: translateX, ty: translateY };
+			viewportEl?.setPointerCapture(e.pointerId);
+		} else if (pointers.size === 1 && e.pointerType === 'touch') {
+			swipeStart = { x: e.clientX, y: e.clientY };
 			viewportEl?.setPointerCapture(e.pointerId);
 		}
 	}
@@ -175,6 +180,15 @@
 	}
 
 	function onPointerUp(e: PointerEvent) {
+		if (e.type === 'pointerup' && swipeStart && pointers.size === 1 && scale === 1) {
+			const deltaX = e.clientX - swipeStart.x;
+			const deltaY = e.clientY - swipeStart.y;
+			if (Math.abs(deltaX) >= 50 && Math.abs(deltaX) > Math.abs(deltaY)) {
+				if (deltaX < 0) next();
+				else prev();
+			}
+		}
+		swipeStart = null;
 		pointers.delete(e.pointerId);
 		if (pointers.size < 2) pinchStartDist = 0;
 		if (pointers.size === 0) panStart = null;
