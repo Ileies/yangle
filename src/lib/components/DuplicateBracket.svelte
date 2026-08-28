@@ -41,6 +41,8 @@
 	let pairIdx = $state(0);
 	let roundNumber = $state(1);
 	let resolving = $state(false);
+	let resolveError = $state<string | null>(null);
+	let retryAction: (() => void) | null = $state(null);
 
 	let currentCluster = $derived(clusters[clusterIdx] ?? []);
 	let totalRounds = $derived(Math.max(1, Math.ceil(Math.log2(Math.max(currentCluster.length, 1)))));
@@ -85,13 +87,46 @@
 		skipByes();
 	}
 
-	function resolvePair(winner: DeckPhoto, loser: DeckPhoto): void {
+	async function resolvePair(winner: DeckPhoto, loser: DeckPhoto): Promise<void> {
+		resolving = true;
+		resolveError = null;
+		try {
+			// A loser is done with the bracket forever, same as a survivor - flip it out of the
+			// pending-cluster query now, otherwise it would keep reappearing as an unresolved
+			// cluster member on every future page load even though its fate is already decided.
+			await markResolved(loser.id);
+		} catch {
+			resolving = false;
+			resolveError = "Couldn't save that choice. Check your connection and try again.";
+			retryAction = () => void resolvePair(winner, loser);
+			return;
+		}
+		resolving = false;
 		onEliminate(loser);
-		// A loser is done with the bracket forever, same as a survivor - flip it out of the
-		// pending-cluster query now, otherwise it would keep reappearing as an unresolved
-		// cluster member on every future page load even though its fate is already decided.
-		void markResolved(loser.id);
 		roundWinners.push(winner);
+		advancePair();
+	}
+
+	// Both photos are worth keeping - neither is eliminated, and neither goes on to face a
+	// future opponent (a "kept" photo has already had its fate decided, same as a bracket
+	// survivor). Both simply exit the bracket and flow into the normal swipe deck.
+	async function resolveKeepBoth(a: DeckPhoto, b: DeckPhoto): Promise<void> {
+		resolving = true;
+		resolveError = null;
+		try {
+			await markResolved(a.id);
+			await markResolved(b.id);
+		} catch {
+			resolving = false;
+			resolveError = "Couldn't save that choice. Check your connection and try again.";
+			retryAction = () => void resolveKeepBoth(a, b);
+			return;
+		}
+		resolving = false;
+		advancePair();
+	}
+
+	function advancePair(): void {
 		pairIdx++;
 		dragPercent = 50;
 		if (pairIdx * 2 >= roundContestants.length) finishRound();
@@ -99,16 +134,25 @@
 	}
 
 	async function markResolved(photoId: number): Promise<void> {
-		await fetch(`/albums/${albumId}/duplicates/resolve`, {
+		const res = await fetch(`/albums/${albumId}/duplicates/resolve`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify({ photoId })
 		});
+		if (!res.ok) throw new Error(`status ${res.status}`);
 	}
 
 	async function resolveSurvivor(photo: DeckPhoto): Promise<void> {
 		resolving = true;
-		await markResolved(photo.id);
+		resolveError = null;
+		try {
+			await markResolved(photo.id);
+		} catch {
+			resolving = false;
+			resolveError = "Couldn't save that choice. Check your connection and try again.";
+			retryAction = () => void resolveSurvivor(photo);
+			return;
+		}
 		resolving = false;
 		if (clusterIdx + 1 < clusters.length) startCluster(clusterIdx + 1);
 		else onAllResolved();
@@ -142,8 +186,8 @@
 		dragging = false;
 		if (!currentPair) return;
 		const [left, right] = currentPair;
-		if (dragPercent < 35) resolvePair(right, left);
-		else if (dragPercent > 65) resolvePair(left, right);
+		if (dragPercent < 35) void resolvePair(right, left);
+		else if (dragPercent > 65) void resolvePair(left, right);
 		else dragPercent = 50;
 	}
 
@@ -185,33 +229,50 @@
 			<img
 				src="/photos/{left.id}/preview"
 				alt={left.displayName}
-				class="absolute inset-0 h-full w-full object-cover"
+				class="absolute inset-0 h-full w-full object-cover select-none"
+				draggable="false"
 			/>
 			<img
 				src="/photos/{right.id}/preview"
 				alt={right.displayName}
-				class="absolute inset-0 h-full w-full object-cover"
+				class="absolute inset-0 h-full w-full object-cover select-none"
 				style:clip-path={clipPath}
+				draggable="false"
 			/>
 		</div>
 
-		<div class="grid grid-cols-2 gap-3">
+		<div class="grid grid-cols-3 gap-3">
 			<button
 				type="button"
 				class="btn"
 				disabled={resolving}
-				onclick={() => resolvePair(left, right)}><Check class="size-4" /> Keep this one</button
+				onclick={() => void resolvePair(left, right)}><Check class="size-4" /> Keep this one</button
+			>
+			<button
+				type="button"
+				class="btn btn-ghost"
+				disabled={resolving}
+				onclick={() => void resolveKeepBoth(left, right)}>Keep both</button
 			>
 			<button
 				type="button"
 				class="btn"
 				disabled={resolving}
-				onclick={() => resolvePair(right, left)}><Check class="size-4" /> Keep this one</button
+				onclick={() => void resolvePair(right, left)}><Check class="size-4" /> Keep this one</button
 			>
 		</div>
 	</div>
 {:else}
 	<div class="flex min-h-full items-center justify-center">
 		<span class="loading loading-spinner"></span>
+	</div>
+{/if}
+
+{#if resolveError}
+	<div class="toast toast-center toast-bottom">
+		<div class="alert alert-warning text-sm">
+			<span>{resolveError}</span>
+			<button type="button" class="btn btn-xs" onclick={() => retryAction?.()}>Retry</button>
+		</div>
 	</div>
 {/if}
