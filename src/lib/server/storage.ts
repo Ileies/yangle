@@ -1,4 +1,4 @@
-import sharp from 'sharp';
+import { PNG } from 'pngjs';
 import exifr from 'exifr';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -7,7 +7,7 @@ import { STORAGE_DIR } from '$env/static/private';
 import { IMAGE_QUALITY, PREVIEW_MAX_PX, THUMBNAIL_MAX_PX } from '$lib/constants';
 import { Orientation } from '$lib/types';
 import { sha256Hex } from '$lib/utils';
-import type { BurstFingerprint } from './burstSimilarity';
+import type { BurstFingerprint } from '$lib/server/burstSimilarity';
 
 export function storagePath(...segments: string[]): string {
 	return path.join(STORAGE_DIR, ...segments);
@@ -16,17 +16,18 @@ export function storagePath(...segments: string[]): string {
 // 8x8 difference hash. This is only the cheap first pass for burst candidates; SSIM and color
 // similarity must also pass before photos are allowed into the same duplicate group.
 async function dHash(buffer: Buffer): Promise<string> {
-	const { data } = await sharp(buffer)
-		.autoOrient()
-		.resize(9, 8, { fit: 'fill' })
-		.grayscale()
-		.raw()
-		.toBuffer({ resolveWithObject: true });
+	const { data } = PNG.sync.read(
+		await new Bun.Image(buffer).resize(9, 8, { fit: 'fill' }).png().buffer()
+	);
+	const luminance = (pixel: number) => {
+		const offset = pixel * 4;
+		return 0.2126 * data[offset] + 0.7152 * data[offset + 1] + 0.0722 * data[offset + 2];
+	};
 
 	let bits = '';
 	for (let row = 0; row < 8; row++) {
 		for (let col = 0; col < 8; col++) {
-			bits += data[row * 9 + col] < data[row * 9 + col + 1] ? '1' : '0';
+			bits += luminance(row * 9 + col) < luminance(row * 9 + col + 1) ? '1' : '0';
 		}
 	}
 
@@ -37,18 +38,14 @@ async function dHash(buffer: Buffer): Promise<string> {
 
 async function burstFingerprint(buffer: Buffer): Promise<BurstFingerprint> {
 	const imageSize = 64;
-	const { data, info } = await sharp(buffer)
-		.autoOrient()
-		.resize(imageSize, imageSize, { fit: 'fill' })
-		.toColourspace('srgb')
-		.removeAlpha()
-		.raw()
-		.toBuffer({ resolveWithObject: true });
+	const { data } = PNG.sync.read(
+		await new Bun.Image(buffer).resize(imageSize, imageSize, { fit: 'fill' }).png().buffer()
+	);
 	const luminance: number[] = [];
 	const colorHistogram = Array<number>(64).fill(0);
 	const pixelCount = imageSize * imageSize;
 	for (let i = 0; i < pixelCount; i++) {
-		const offset = i * info.channels;
+		const offset = i * 4;
 		const red = data[offset];
 		const green = data[offset + 1];
 		const blue = data[offset + 2];
@@ -97,19 +94,23 @@ async function writeAtomic(
 	await rename(tempPath, destPath);
 }
 
-// Writes the original plus a preview (swipe deck) and thumbnail (grids, duplicate-resolution
-// screen) size, both re-encoded as WebP. For HEIC/HEIF originals (the iPhone default), also
-// writes a JPEG compatibility copy via the same sharp/libvips pipeline - no separate ffmpeg
-// dependency, and correctly carries over the embedded ICC profile (Display P3 on iPhone)
-// instead of washing colors out. Skips re-processing if the content hash already exists on
-// disk (same bytes uploaded again, possibly under a different name).
 export async function storeUpload(buffer: Buffer, extensionHint: string): Promise<StoredImage> {
+	if (typeof Bun.Image !== 'function') throw new Error('Image processing requires Bun >= 1.3.14.');
+	const metadata = await new Bun.Image(buffer, { autoOrient: false }).metadata();
+	if (process.platform === 'linux' && HEIF_FORMATS.has(metadata.format)) {
+		throw new Error(
+			'HEIC/HEIF and AVIF uploads are not supported on this server. Upload JPEG or PNG instead.'
+		);
+	}
 	const contentHash = await sha256Hex(Uint8Array.from(buffer));
 	const fingerprint = await burstFingerprint(buffer);
 	const perceptualHash = fingerprint.dHash;
-	const metadata = await sharp(buffer).metadata();
-	const width = metadata.autoOrient.width ?? metadata.width ?? 0;
-	const height = metadata.autoOrient.height ?? metadata.height ?? 0;
+	const exifOrientation =
+		metadata.format === 'jpeg' ? await exifr.orientation(buffer).catch(() => undefined) : undefined;
+	const swapDimensions =
+		exifOrientation !== undefined && exifOrientation >= 5 && exifOrientation <= 8;
+	const width = swapDimensions ? metadata.height : metadata.width;
+	const height = swapDimensions ? metadata.width : metadata.height;
 	const orientation = width >= height ? Orientation.Landscape : Orientation.Portrait;
 
 	// EXIF absence (screenshots, downloaded images, stripped-metadata exports) is expected, not
@@ -131,22 +132,20 @@ export async function storeUpload(buffer: Buffer, extensionHint: string): Promis
 	if (!(await Bun.file(storagePath(originalRelative)).exists())) {
 		await writeAtomic(storagePath(originalRelative), (tempPath) => Bun.write(tempPath, buffer));
 		await writeAtomic(storagePath(previewRelative), (tempPath) =>
-			sharp(buffer)
-				.autoOrient()
+			new Bun.Image(buffer)
 				.resize(PREVIEW_MAX_PX, PREVIEW_MAX_PX, { fit: 'inside', withoutEnlargement: true })
 				.webp({ quality: IMAGE_QUALITY })
-				.toFile(tempPath)
+				.write(tempPath)
 		);
 		await writeAtomic(storagePath(thumbnailRelative), (tempPath) =>
-			sharp(buffer)
-				.autoOrient()
+			new Bun.Image(buffer)
 				.resize(THUMBNAIL_MAX_PX, THUMBNAIL_MAX_PX, { fit: 'inside', withoutEnlargement: true })
 				.webp({ quality: IMAGE_QUALITY })
-				.toFile(tempPath)
+				.write(tempPath)
 		);
 		if (compatOriginalRelative) {
 			await writeAtomic(storagePath(compatOriginalRelative), (tempPath) =>
-				sharp(buffer).autoOrient().jpeg({ quality: 92 }).toFile(tempPath)
+				new Bun.Image(buffer).jpeg({ quality: 92 }).write(tempPath)
 			);
 		}
 	}

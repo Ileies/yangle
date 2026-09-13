@@ -9,6 +9,10 @@ Legend: `[x]` done, `[ ]` not started/not finished yet.
 
 ## Remaining work (quick scan)
 
+- [ ] Validate the Bun.Image migration after upgrading to Bun >= 1.3.14. Tests, builds and type
+      checks were intentionally not run for this migration. Include duplicate grouping across
+      colour profiles, portrait orientation, preview/thumbnail generation and compatibility downloads.
+- [ ] Restore HEIC/HEIF and AVIF uploads on Linux when a suitable Bun codec becomes available.
 - [ ] PWA manifest (§0)
 - [ ] HEIC real-device decode-performance test, and a download UI that distinguishes
       "original (HEIC)" vs. "compatible (JPEG)" instead of silently picking one (§2)
@@ -18,8 +22,8 @@ Legend: `[x]` done, `[ ]` not started/not finished yet.
 - [ ] Design language: evaluate echoing the yin-yang curve behind the swipe deck's own
       keep/delete zone indicators (optional, low priority)
 
-Everything else below is done and verified live against a running dev server (not just
-type-checked/linted — see each section's "verified"/"implementation notes" for specifics).
+Verification notes below describe earlier implementation work. They do not verify the Bun.Image
+migration, whose runtime validation remains pending above.
 
 ---
 
@@ -69,22 +73,12 @@ the session immediately.
 
 ## 2. Albums & upload
 
-- [x] **HEIC/HEIF input support**: most contributors will be uploading straight from an
-      iPhone, which shoots HEIC by default — and no browser can render HEIC in an `<img>` tag.
-      `sharp` already links against `libheif` (confirmed via `sharp.versions` on this machine),
-      so `storeUpload()` decodes it without extra setup; thumbnail/preview are always
-      re-encoded to WebP already, so those were unaffected either way. For the **original**
-      file (kept byte-for-byte for ZIP download, since an Apple recipient wants the real
-      HEIC): `storeUpload()` also writes a JPEG compatibility rendition (`compatOriginalPath`,
-      quality 92) through the same sharp/libvips pipeline whenever the source format is
-      HEIC/HEIF/AVIF, so a Windows/Android recipient has something they can open without the
-      sender needing to know or care. Deliberately **not** ffmpeg: most prebuilt ffmpeg
-      binaries aren't compiled with `libheif` support at all (HEVC licensing), so it's both a
-      second native dependency to fight NixOS/FHS issues for and a _less_ reliable HEIC path
-      than the sharp/libvips pipeline already in use. Sharp also carries over the embedded ICC
-      profile (iPhones shoot Display P3) when converting to JPEG, avoiding washed-out colors.
-  - [ ] Still needs a real-device test: confirm `sharp`'s HEIC decode performs acceptably
-        (it's slower than JPEG) under real upload volume, not just a one-off test image
+- [ ] **HEIC/HEIF input support**: after the Bun.Image migration, decoding is available only
+      on supported macOS/Windows hosts. Linux returns a per-file error requesting JPEG or PNG.
+      Supported hosts still produce WebP previews/thumbnails and a quality-92 JPEG compatibility
+      rendition while preserving the original bytes. Previously stored originals and renditions
+      remain downloadable on all platforms.
+  - [ ] Confirm Bun.Image's HEIC decode performance on a supported host under real upload volume.
   - [ ] Download UI (§6) should distinguish "original (HEIC)" vs. "compatible (JPEG)" when
         `compatOriginalPath` is set, rather than silently picking one — the ZIP download
         currently always ships the true original

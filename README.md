@@ -14,7 +14,8 @@ SQLite app that keeps uploaded photos on local disk.
 ## Features
 
 - **Passwordless auth** — magic-link email sign-in, revocable sessions.
-- **Albums** — create, upload (drag/pick files or a whole folder, HEIC/HEIF supported), share.
+- **Albums**: create, upload (drag/pick files or a whole folder), share. HEIC/HEIF and AVIF
+  decoding requires a supported macOS/Windows host; Linux uploads must use JPEG, PNG or WebP.
 - **Dedup on upload** — content-hash based, so re-uploading the same photo (even renamed) never
   creates a duplicate; a name conflict on the same content prompts you to pick which name to
   keep.
@@ -38,17 +39,17 @@ SQLite app that keeps uploaded photos on local disk.
 - **Drizzle ORM** over **SQLite** (`bun:sqlite` at runtime — no native `better-sqlite3` build
   needed; see [NixOS notes](#nixos-notes))
 - **`@sveltejs/adapter-node`** — self-hosted, matches the "storage is local disk" design
-- **`sharp`** for image processing (thumbnails, previews, HEIC→JPEG compatibility renditions),
-  **`fflate`** for streamed ZIP downloads (pure JS, no native binary)
+- **`Bun.Image`** for thumbnails, previews and JPEG compatibility renditions on supported hosts;
+  **`pngjs`** reads the small generated PNGs used for duplicate fingerprints (pure JavaScript).
+  **`fflate`** handles streamed ZIP downloads.
 - No test runner yet — see `TODO.md`
 
 ## Getting started
 
 ### Prerequisites
 
-- [Bun](https://bun.sh)
-- A SQLite-capable environment — on NixOS specifically, see [NixOS notes](#nixos-notes) below,
-  since `sharp` needs a native library not on the default library path outside FHS distros.
+- [Bun >= 1.3.14](https://bun.com/blog/bun-v1.3.14), including in production (`bun run start`).
+- A SQLite-capable environment; see [NixOS notes](#nixos-notes) below.
 
 ### Setup
 
@@ -88,17 +89,15 @@ easiest way to develop locally.
 
 ## NixOS notes
 
-Two native-binary npm packages hit the classic NixOS non-FHS problem:
+Image processing uses Bun's built-in codecs, without a native npm image addon or a custom
+`LD_LIBRARY_PATH`. The flake provides Bun; update its nixpkgs input once Bun >= 1.3.14 is
+available there. No system or flake-input update is performed as part of the migration.
 
-- **`sharp`** (image resizing/thumbnailing): its prebuilt binary `dlopen()`s `libstdc++.so.6`
-  at runtime, which isn't on the default library path outside FHS distros. `flake.nix` sets
-  `LD_LIBRARY_PATH` to include `stdenv.cc.cc.lib` to fix this — **always run this project
-  inside the flake dev shell** (`direnv allow`, or `nix develop`), or any route that touches
-  image storage will crash with `ERR_DLOPEN_FAILED`. This has bitten the project before in a
-  subtle way: a module that merely _imports_ something that imports `sharp` pulls this
-  requirement into its whole module graph at import time, not just when the sharp-touching
-  function is actually called — see the dynamic-import pattern in `server/albums.ts`'s
-  `deleteAlbum` for how to keep that blast radius contained.
+[`Bun.Image`](https://bun.com/docs/runtime/image) supports JPEG, PNG and WebP on Linux.
+HEIC/HEIF and AVIF decoding requires supported OS codecs on macOS/Windows. JPEG EXIF orientation
+is applied automatically; PNG/WebP EXIF orientation is not. Output preserves ICC profiles.
+Duplicate fingerprints use the decoded colour values, without the former explicit sRGB conversion.
+
 - **`better-sqlite3`** (the natural `drizzle-kit` CLI driver): needs to compile from source via
   node-gyp, not set up out of the box here. Swapped for `@libsql/client` (ships prebuilt napi
   bindings), used **only** by the `drizzle-kit` CLI, never at runtime.
@@ -106,7 +105,7 @@ Two native-binary npm packages hit the classic NixOS non-FHS problem:
 Also: `vite dev`/`vite build` must run as `bun --bun vite dev` (already wired into
 `package.json`), not plain `vite dev` — otherwise Vite's SSR module loader falls back to
 Node's ESM loader, which doesn't understand the `bun:sqlite` import scheme used by
-`drizzle-orm/bun-sqlite`.
+`drizzle-orm/bun-sqlite`. Production also runs on Bun via `bun run start`.
 
 ## Data model
 

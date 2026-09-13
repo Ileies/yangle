@@ -210,10 +210,7 @@ export async function updateDecisionSettings(
 
 // Removes every photo's disk files, then the album row itself - `photos`/`album_shares`/
 // `decisions`/`download_batches` all cascade via FK on delete, but the files under `storage/`
-// don't, so those have to go first while we still have the rows to read paths from. Imports
-// `storage.ts` lazily (it pulls in `sharp`, a native module) so that every other page routed
-// through this file - the album list, settings, sharing, invites - doesn't need `sharp`'s
-// native binary loadable just to render.
+// don't, so those have to go first while we still have the rows to read paths from.
 export async function deleteAlbum(albumId: number): Promise<void> {
 	const { deleteStoredFiles } = await import('./storage');
 	const albumPhotos = await db.query.photos.findMany({ where: eq(photos.albumId, albumId) });

@@ -6,15 +6,9 @@ gotchas and conventions that aren't obvious from the code itself.
 
 ## Before you start a session
 
-Confirm you're inside the Nix dev shell (`direnv allow` once per checkout, or `nix develop`).
-Outside it, `LD_LIBRARY_PATH` isn't set and anything that touches `sharp` (image
-storage/thumbnailing) crashes with `ERR_DLOPEN_FAILED: libstdc++.so.6`. This has happened before
-via an _indirect_ import — a module that merely imports `storage.ts` pulls `sharp` into its
-whole module graph at import time, even if the sharp-touching function is never called on that
-request path. If you add a new static import of `storage.ts` (or anything importing it) to a
-file that's imported by routes that previously didn't need `sharp`, you've just widened that
-requirement — check whether a dynamic `import()` scoped to the function that actually needs it
-(see `deleteAlbum` in `server/albums.ts`) is more appropriate before committing.
+Use Bun >= 1.3.14 for `Bun.Image`, including for production. The Nix dev shell is optional and
+no image-specific `LD_LIBRARY_PATH` is needed. HEIC/HEIF and AVIF decoding is unavailable on
+Linux with this API; see `README.md` for platform limitations.
 
 Always run the dev server as `bun run dev` (→ `bun --bun vite dev`), never plain `vite dev` —
 Node's ESM loader doesn't understand the `bun:sqlite` import scheme `drizzle-orm/bun-sqlite`
@@ -34,10 +28,8 @@ adding once the swipe-deck gesture logic stabilizes). Until then:
 - Use throwaway test data (a scratch album/user), and clean it up afterward — `sqlite3 local.db
 "DELETE FROM ..."` for rows, remove any test files you wrote under `storage/`. Don't leave
   test artifacts in the real `local.db` the user's own dev server is pointed at.
-- When testing "what happens outside the Nix shell" specifically (e.g. verifying a fix to the
-  `sharp` blast-radius problem above), run a _separate_ throwaway dev server with
-  `env -u LD_LIBRARY_PATH bun run dev` on a different port — never touch the user's own running
-  dev server process to test this.
+- Run manual checks on a separate throwaway dev server on a different port. Never alter the
+  user's running dev server process to test a change.
 
 ## Route structure: the +page/+server collision gotcha
 

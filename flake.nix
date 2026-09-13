@@ -14,9 +14,6 @@
       {
         devShells.default = pkgs.mkShell {
           buildInputs = [ pkgs.bun ];
-          # sharp ships a prebuilt native binary that dlopen()s libstdc++.so.6 at runtime,
-          # which isn't on the default library path outside FHS distros.
-          LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath [ pkgs.stdenv.cc.cc.lib ];
         };
       });
 }

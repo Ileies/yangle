@@ -25,7 +25,7 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 	const failed: { name: string; error: string }[] = [];
 	const usedNames = new Set(await listPhotoNames(albumId));
 
-	// storeUpload (sharp encoding, EXIF/hash parsing) is CPU/IO-bound and independent per file,
+	// storeUpload (image encoding, EXIF/hash parsing) is CPU/IO-bound and independent per file,
 	// so it's safe to fan out within a bounded chunk. Inserts remain sequential to preserve
 	// upload order. Once every successful insert is known, this request's photos are clustered
 	// together without consulting unrelated historical photos in the album.
