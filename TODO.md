@@ -494,9 +494,9 @@ Implementation notes:
 
 ## 6. Downloads
 
-- [x] `/albums/[id]/download` — build ZIP of all `keep`/`favorite` originals for the current
-      user, stream it (don't pre-build and store the whole thing), write progress to
-      `download_batches`
+- [x] `/albums/[id]/download` builds a ZIP of all `keep`/`favorite` originals for the current
+      user and saves it under `storage/zips` so interrupted downloads can resume with byte ranges.
+      Progress is recorded in `download_batches`.
 - [x] On completion, mark `photo_downloads` for each included photo × user
 - [x] Download page shows a per-photo badge: already downloaded / newly added since last
       download / not yet decided
@@ -509,16 +509,14 @@ Implementation notes:
   `recordDownloadBatch`/`completeDownloadBatch`/`failDownloadBatch`.
 - Picked `fflate` over `archiver`: pure JS, no native binary, one less thing to fight the
   NixOS/FHS problem that already affected image processing and `better-sqlite3`.
-- Routes: `/albums/[id]/download` (page — badge list + "Download ZIP (N)" link) and
-  `/albums/[id]/download/zip` (`+server.ts`, kept off the page's own directory — same
-  route-collision gotcha as §5). The zip endpoint streams: `fflate`'s `Zip` class emits
-  compressed chunks via callback, piped straight into a `ReadableStream`, so the full archive
-  is never buffered in memory. Each original is still read fully off disk one at a time before
-  being added (not itself streamed), fine at this app's scale (hundreds, not thousands, of
-  photos per album). The `download_batches` row is written `pending` before streaming starts
-  and flipped to `ready` (with `photo_downloads` stamped) only after the whole archive has
-  been generated — a client disconnect mid-stream leaves the batch `pending` rather than
-  falsely marking photos downloaded.
+- Routes: `/albums/[id]/download` (page with badges and a download link),
+  `/albums/[id]/download/zip` (archive generation), and
+  `/albums/[id]/download/zip/[batchId]` (stable file download). The generation route writes
+  `fflate` chunks to a temporary file, then renames it into place and redirects to the stable
+  URL. Each original is read fully off disk one at a time. The file route supports `HEAD`,
+  `Range`, and `If-Range`, with a known `Content-Length` and `ETag`. It checks both album
+  membership and batch ownership. The batch becomes `ready` and photos are marked downloaded
+  once the archive is ready; this does not confirm that the client received every byte.
 - Duplicate display names within one ZIP (two different content hashes can legitimately share
   a file name, §2) get the photo id appended before the extension so the archive never
   silently overwrites one entry with another.

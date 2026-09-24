@@ -29,7 +29,7 @@ SQLite app that keeps uploaded photos on local disk.
   (can only decide) roles, independent or joint (`together`) decision modes. In `together` mode,
   everyone swipes independently and a resolve screen surfaces only the photos where decisions
   disagree, for one final joint call.
-- **Downloads** — a streamed ZIP of everything you kept/favorited, with per-photo badges for
+- **Downloads**: a resumable ZIP of everything you kept/favorited, with per-photo badges for
   already-downloaded / new-since-last-download / not-yet-decided.
 
 ## Tech stack
