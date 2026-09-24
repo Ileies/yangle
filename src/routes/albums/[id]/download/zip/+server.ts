@@ -1,4 +1,7 @@
 import { error, redirect } from '@sveltejs/kit';
+import { resolve } from '$app/paths';
+import { rename, unlink } from 'node:fs/promises';
+import { randomUUID } from 'node:crypto';
 import { Zip, ZipPassThrough } from 'fflate';
 import { db } from '$lib/server/db';
 import { albums } from '$lib/server/db/schema';
@@ -53,17 +56,13 @@ export const GET: RequestHandler = async ({ params, locals }) => {
 	);
 	const used = new Set<string>();
 
-	// Streams the ZIP as it's built rather than buffering the whole archive in memory first -
-	// fflate's `Zip` emits compressed chunks via a callback, which maps directly onto a
-	// `ReadableStream`'s controller. Each original is still read fully into memory one at a
-	// time before being added (not itself streamed off disk), which is fine at this app's
-	// scale (hundreds, not thousands, of photos per album - see storage.ts/TODO.md).
+	// Save a complete archive before serving it. A stable file size and URL let iOS resume
+	// interrupted downloads with HTTP range requests. Originals are read one at a time.
 	const stream = new ReadableStream<Uint8Array>({
 		start(controller) {
 			const zip = new Zip((err, chunk, final) => {
 				if (err) {
 					controller.error(err);
-					failDownloadBatch(batchId).catch(() => {});
 					return;
 				}
 				controller.enqueue(chunk);
@@ -81,23 +80,33 @@ export const GET: RequestHandler = async ({ params, locals }) => {
 					entry.push(bytes, true);
 				}
 				zip.end();
-				await completeDownloadBatch(
-					batchId,
-					photos.map((photo) => photo.id),
-					email
-				);
 			})().catch((err) => {
 				controller.error(err);
-				failDownloadBatch(batchId).catch(() => {});
 			});
 		}
 	});
 
-	const safeName = album.name.replace(/[^a-z0-9 _-]/gi, '_').trim() || 'album';
-	return new Response(stream, {
-		headers: {
-			'Content-Type': 'application/zip',
-			'Content-Disposition': `attachment; filename="${safeName}.zip"`
-		}
-	});
+	const zipPath = `zips/${batchId}.zip`;
+	const temporaryPath = storagePath('zips', `${batchId}.${randomUUID()}.tmp`);
+	try {
+		await Bun.write(Bun.file(temporaryPath), new Response(stream));
+		await rename(temporaryPath, storagePath(zipPath));
+		await completeDownloadBatch(
+			batchId,
+			photos.map((photo) => photo.id),
+			email,
+			zipPath
+		);
+	} catch (err) {
+		await unlink(temporaryPath).catch(() => {});
+		await failDownloadBatch(batchId);
+		throw err;
+	}
+	redirect(
+		303,
+		resolve('/albums/[id]/download/zip/[batchId]', {
+			id: String(albumId),
+			batchId: String(batchId)
+		})
+	);
 };

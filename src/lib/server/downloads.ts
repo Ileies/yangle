@@ -95,11 +95,12 @@ export async function recordDownloadBatch(
 export async function completeDownloadBatch(
 	batchId: number,
 	photoIds: number[],
-	email: string
+	email: string,
+	zipPath: string
 ): Promise<void> {
 	await db
 		.update(downloadBatches)
-		.set({ status: DownloadBatchStatus.Ready, readyAt: Date.now() })
+		.set({ status: DownloadBatchStatus.Ready, readyAt: Date.now(), zipPath })
 		.where(eq(downloadBatches.id, batchId));
 	if (photoIds.length === 0) return;
 	const downloadedAt = Date.now();
