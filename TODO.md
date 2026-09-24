@@ -9,9 +9,9 @@ Legend: `[x]` done, `[ ]` not started/not finished yet.
 
 ## Remaining work (quick scan)
 
-- [ ] Validate the Bun.Image migration after upgrading to Bun >= 1.3.14. Tests, builds and type
-      checks were intentionally not run for this migration. Include duplicate grouping across
-      colour profiles, portrait orientation, preview/thumbnail generation and compatibility downloads.
+- [x] Bun.Image functionality tested by the user after the migration.
+- [ ] Complete targeted migration checks for duplicate grouping across colour profiles, portrait
+      orientation, preview/thumbnail generation and compatibility downloads.
 - [ ] Restore HEIC/HEIF and AVIF uploads on Linux when a suitable Bun codec becomes available.
 - [ ] PWA manifest (§0)
 - [ ] HEIC real-device decode-performance test, and a download UI that distinguishes
@@ -21,9 +21,18 @@ Legend: `[x]` done, `[ ]` not started/not finished yet.
 - [ ] Sharing: `live` resolveMode for `together`-mode albums — Phase 2+, needs SSE infra (§5)
 - [ ] Design language: evaluate echoing the yin-yang curve behind the swipe deck's own
       keep/delete zone indicators (optional, low priority)
+- [ ] Bug: duplicate-bracket survivor doesn't reach the current session's swipe deck without a
+      full reload — see §3.4's writeup for the fix shape
+- [ ] DX: `/upload/resolve` (and worth spot-checking other POST `+server.ts` handlers) only
+      type-asserts the request body via `as`, with no runtime validation — a malformed body
+      (wrong types, missing fields) fails downstream with a less obvious error instead of a
+      clean 400. Not currently exploitable (the request-body strings all flow through
+      `flattenImageName`/`uniqueImageName`, which already strip path separators before
+      anything touches the filesystem or the ZIP writer), but worth a validation pass
+      (`zod` or manual guards) for clearer failure modes as more endpoints accumulate.
 
-Verification notes below describe earlier implementation work. They do not verify the Bun.Image
-migration, whose runtime validation remains pending above.
+Verification notes below describe earlier implementation work. The user has since tested
+Bun.Image successfully; the targeted checks above remain pending.
 
 ---
 
@@ -239,7 +248,7 @@ originals over a congested transpacific route will get a spinner, not a swipe de
       China round-trip problem, but an infra decision outside this repo's scope.
 - [x] Serve WebP with a DPR check before requesting so a 1x display doesn't download 3x pixels.
 - [x] Skeleton/blur-up placeholder: reuse the already-fetched thumbnail, scaled up and blurred
-      via CSS `filter: blur(...)`, cross-fading to the sharp preview on decode.
+      via CSS `filter: blur(...)`, cross-fading to the full preview on decode.
 - [x] Explicit failure state per card: a preview that fails to load (timeout/network error)
       shows a retry affordance rather than a broken-image icon or a silently stalled deck.
 
@@ -296,9 +305,22 @@ reach the swipe deck.
       toward the photo to discard; tap-to-pick on either half also works as a fallback.
       Winner advances (held client-side until the bracket completes); loser is marked `delete`
       immediately via the same decisions-write path as a normal swipe (revisable later like any
-      other decision). Last-photo-standing gets `duplicateResolved: true` and flows into the
-      normal swipe deck queue. Progress indicator across the whole multi-cluster resolution
-      phase ("Round 2 of 3 · burst 4 of 7").
+      other decision). Last-photo-standing gets `duplicateResolved: true` server-side. Progress
+      indicator across the whole multi-cluster resolution phase ("Round 2 of 3 · burst 4 of 7").
+- [ ] **Bug**: a bracket survivor (or a "keep both" pair) is marked `duplicateResolved: true` in
+      the DB but never actually reaches the _current session's_ swipe deck — `SwipeSession.svelte`
+      constructs `SwipeDeck` once at mount from the `load`'s pre-bracket queue/total, and
+      `onAllResolved` (`SwipeSession.svelte`, wired to `DuplicateBracket`'s `resolveSurvivor`/
+      `resolveKeepBoth`) only flips `clustersPending = false` — nothing pushes the resolved
+      photo into `deck.queue`, and `deck.total` is `readonly` so it can't just be bumped in
+      place either. If an album's remaining unresolved photos are entirely inside one cluster,
+      finishing the bracket falls straight to the "nothing to swipe" empty state even though a
+      photo is now undecided in the DB — invisible until a full page reload. Needs either: (a)
+      `DuplicateBracket` reporting resolved survivor(s) up through a new callback so
+      `SwipeSession` can append to `deck.queue` and bump `deck.total`/`SwipeDeck`'s total
+      handling to allow growth, or (b) `invalidateAll()` after the bracket completes and
+      `SwipeDeck` re-syncing off fresh `load` data instead of only reading it once at
+      construction.
 - [x] **Design language**: the divider is a gentle S-curve (SVG `<path>`/`clip-path`), not
       straight — the curve's midpoint follows the drag position, control points scale with the
       drag offset rather than degenerating into a straight line at the extremes.
@@ -486,7 +508,7 @@ Implementation notes:
   kept/favorited photo; re-downloading is always allowed, "new" is just a badge not a filter),
   `recordDownloadBatch`/`completeDownloadBatch`/`failDownloadBatch`.
 - Picked `fflate` over `archiver`: pure JS, no native binary, one less thing to fight the
-  NixOS/FHS problem that already bit `sharp`/`better-sqlite3`.
+  NixOS/FHS problem that already affected image processing and `better-sqlite3`.
 - Routes: `/albums/[id]/download` (page — badge list + "Download ZIP (N)" link) and
   `/albums/[id]/download/zip` (`+server.ts`, kept off the page's own directory — same
   route-collision gotcha as §5). The zip endpoint streams: `fflate`'s `Zip` class emits
