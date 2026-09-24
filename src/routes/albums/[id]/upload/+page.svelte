@@ -162,12 +162,17 @@
 
 	async function resolveConflict(conflict: Conflict, keepName: string) {
 		const otherName = keepName === conflict.existingName ? conflict.newName : conflict.existingName;
-		await fetch(`/albums/${data.album.id}/upload/resolve`, {
-			method: 'POST',
-			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ photoId: conflict.photoId, keepName, otherName })
-		});
-		conflicts = conflicts.filter((c) => c !== conflict);
+		try {
+			const res = await fetch(`/albums/${data.album.id}/upload/resolve`, {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json' },
+				body: JSON.stringify({ photoId: conflict.photoId, keepName, otherName })
+			});
+			if (!res.ok) throw new Error();
+			conflicts = conflicts.filter((c) => c !== conflict);
+		} catch {
+			errorMessage = `Couldn't resolve the name conflict for "${conflict.newName}".`;
+		}
 	}
 
 	const busy = $derived(status === 'hashing' || status === 'uploading');
