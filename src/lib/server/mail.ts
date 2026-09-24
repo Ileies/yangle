@@ -1,12 +1,8 @@
 import nodemailer from 'nodemailer';
-import {
-	APP_URL,
-	SMTP_FROM,
-	SMTP_HOST,
-	SMTP_PASS,
-	SMTP_PORT,
-	SMTP_USER
-} from '$env/static/private';
+import { APP_URL } from '$env/static/private';
+import { env } from '$env/dynamic/private';
+
+const { SMTP_FROM = '', SMTP_HOST = '', SMTP_PASS = '', SMTP_PORT = '587', SMTP_USER = '' } = env;
 
 const transporter = SMTP_HOST
 	? nodemailer.createTransport({
