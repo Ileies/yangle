@@ -88,10 +88,10 @@ easiest way to develop locally.
 | `bun run db:migrate`  | Apply pending migrations                                                      |
 | `bun run db:studio`   | Drizzle Studio (browse/edit the SQLite DB)                                    |
 
-`bun run deploy` expects SSH access to `ros`, a checkout at `/var/www/yangle`, and an existing
-PM2 process named `yangle`. Configure the server's `.env` (including persistent
-`DATABASE_URL` and `STORAGE_DIR` paths) before deploying. The deploy command stops if any step
-fails, before restarting PM2.
+`bun run deploy` expects SSH access to `ros`, a checkout at `/var/www/yangle`, an existing
+systemd service named `yangle`, and passwordless sudo permission to restart it. Configure the
+server's `.env` (including persistent `DATABASE_URL` and `STORAGE_DIR` paths) before deploying.
+The deploy command stops if any step fails, before restarting the service.
 
 ## NixOS notes
 

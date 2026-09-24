@@ -557,8 +557,8 @@ Listed so gaps read as deliberate deferrals, not oversights:
   usage shows it's needed, not before
 - **Automated tests** — no vitest/playwright setup yet. Worth adding once the swipe-deck
   gesture logic (§3.1) stabilizes, since that's the part most likely to regress silently
-- **Production process management** (PM2 config, systemd unit, reverse-proxy config) — the
-  `ros` deploy command assumes an existing PM2 process named `yangle`; add process and proxy
+- **Production process management** (systemd unit, reverse-proxy config) - the
+  `ros` deploy command assumes an existing systemd service named `yangle`; add process and proxy
   configuration when those settings are settled
 - **Admin/moderation tooling** — not needed at family-and-friends scale; revisit only if that
   changes

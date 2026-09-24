@@ -9,7 +9,7 @@
 	"scripts": {
 		"dev": "bun --bun vite dev",
 		"build": "bun --bun vite build",
-		"deploy": "ssh ros 'cd /var/www/yangle && git pull --ff-only && bun install --frozen-lockfile && bun run build && bun run db:migrate && pm2 restart yangle'",
+		"deploy": "ssh ros 'cd /var/www/yangle && git pull --ff-only && bun install --frozen-lockfile && bun run build && bun run db:migrate && sudo -n systemctl restart yangle'",
 		"preview": "vite preview",
 		"start": "bun build/index.js",
 		"prepare": "svelte-kit sync || echo ''",
