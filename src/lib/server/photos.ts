@@ -1,7 +1,6 @@
 import { db } from './db';
 import { photoNameVariants, photos } from './db/schema';
 import { and, eq, inArray } from 'drizzle-orm';
-import { deleteStoredFiles } from './storage';
 import type { StoredImage } from './storage';
 import type { Photo } from '$lib/types';
 import { buildBurstClusters, type BurstCandidate } from './burstSimilarity';
@@ -105,20 +104,24 @@ export async function listPhotoNames(albumId: number): Promise<string[]> {
 
 // Permanently removes the given photos (must belong to `albumId`, so a crafted id from another
 // album can't be deleted through here) - the DB rows plus every rendition on disk. Unlike a
-// decision status, this can't be undone.
+// decision status, this can't be undone. Deletes files first while `rows` still holds their
+// paths, then the DB rows (same ordering as deleteAlbum, and for the same reason - a crash
+// between the two steps should leave orphaned-but-findable rows, not orphaned files with
+// nothing left pointing at them).
 export async function deletePhotos(albumId: number, ids: number[]): Promise<void> {
 	if (ids.length === 0) return;
 	const rows = await db.query.photos.findMany({
 		where: and(eq(photos.albumId, albumId), inArray(photos.id, ids))
 	});
 	if (rows.length === 0) return;
+	const { deleteStoredFiles } = await import('./storage');
+	await Promise.all(rows.map((row) => deleteStoredFiles(row)));
 	await db.delete(photos).where(
 		inArray(
 			photos.id,
 			rows.map((row) => row.id)
 		)
 	);
-	await Promise.all(rows.map((row) => deleteStoredFiles(row)));
 }
 
 // Photos still awaiting a decision from this user, excluding ones stuck in an unresolved
