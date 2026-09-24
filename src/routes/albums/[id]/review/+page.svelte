@@ -39,11 +39,23 @@
 	let visiblePhotos = $derived(visible.map((entry) => entry.photo));
 	let statuses = $derived(new SvelteMap(entries.map((entry) => [entry.photo.id, entry.status])));
 
+	// Reassigning `openIndex` after `entries` changes matters whenever a status filter is
+	// active: changing a photo's status can remove it from `visiblePhotos`, shifting every
+	// later index down - without this, PhotoViewer would keep showing whatever photo now
+	// happens to sit at the old index (or nothing, if that index no longer exists).
+	function reindexOpenViewer(photoId: number): void {
+		if (openIndex === null) return;
+		const newIndex = visiblePhotos.findIndex((p) => p.id === photoId);
+		openIndex = newIndex === -1 ? null : newIndex;
+	}
+
 	async function setStatus(photo: Photo, status: DecisionStatus): Promise<void> {
 		const index = entries.findIndex((e) => e.photo.id === photo.id);
 		if (index === -1) return;
 		const previous = entries[index].status;
+		const wasOpen = openIndex !== null && visiblePhotos[openIndex]?.id === photo.id;
 		entries = entries.map((e, i) => (i === index ? { ...e, status } : e));
+		if (wasOpen) reindexOpenViewer(photo.id);
 		try {
 			const res = await fetch(`/albums/${data.album.id}/decisions`, {
 				method: 'POST',
@@ -53,6 +65,7 @@
 			if (!res.ok) throw new Error();
 		} catch {
 			entries = entries.map((e, i) => (i === index ? { ...e, status: previous } : e));
+			if (wasOpen) reindexOpenViewer(photo.id);
 			errorMessage = `Couldn't update "${photo.displayName}".`;
 		}
 	}
@@ -61,6 +74,7 @@
 		if (entries.every((e) => e.status === DecisionStatus.Undecided)) return;
 		if (!confirm(`Reset all ${entries.length} photos to undecided?`)) return;
 		const previous = entries;
+		openIndex = null;
 		entries = entries.map((e) => ({ ...e, status: DecisionStatus.Undecided }));
 		try {
 			const res = await fetch(`/albums/${data.album.id}/decisions`, {
