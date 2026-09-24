@@ -79,6 +79,7 @@ easiest way to develop locally.
 | --------------------- | ----------------------------------------------------------------------------- |
 | `bun run dev`         | Dev server (must be `bun --bun vite dev`, wired in already — see NixOS notes) |
 | `bun run build`       | Production build                                                              |
+| `bun run deploy`      | Pull, install, build, migrate and restart the app on `ros` via SSH            |
 | `bun run preview`     | Preview a production build                                                    |
 | `bun run check`       | `svelte-kit sync` + `svelte-check`                                            |
 | `bun run lint`        | `prettier --check` + `eslint`                                                 |
@@ -86,6 +87,11 @@ easiest way to develop locally.
 | `bun run db:generate` | Generate a Drizzle migration from schema changes                              |
 | `bun run db:migrate`  | Apply pending migrations                                                      |
 | `bun run db:studio`   | Drizzle Studio (browse/edit the SQLite DB)                                    |
+
+`bun run deploy` expects SSH access to `ros`, a checkout at `/var/www/yangle`, and an existing
+PM2 process named `yangle`. Configure the server's `.env` (including persistent
+`DATABASE_URL` and `STORAGE_DIR` paths) before deploying. The deploy command stops if any step
+fails, before restarting PM2.
 
 ## NixOS notes
 

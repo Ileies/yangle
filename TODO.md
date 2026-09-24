@@ -557,8 +557,9 @@ Listed so gaps read as deliberate deferrals, not oversights:
   usage shows it's needed, not before
 - **Automated tests** — no vitest/playwright setup yet. Worth adding once the swipe-deck
   gesture logic (§3.1) stabilizes, since that's the part most likely to regress silently
-- **Production process management** (PM2 config, systemd unit, reverse-proxy config) — sibling
-  projects use `pm2.config.cjs`; add the equivalent once there's an actual deploy target
+- **Production process management** (PM2 config, systemd unit, reverse-proxy config) — the
+  `ros` deploy command assumes an existing PM2 process named `yangle`; add process and proxy
+  configuration when those settings are settled
 - **Admin/moderation tooling** — not needed at family-and-friends scale; revisit only if that
   changes
 - **Accessibility pass** (screen reader support for the swipe deck, reduced-motion mode beyond
