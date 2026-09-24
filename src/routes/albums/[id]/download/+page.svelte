@@ -3,9 +3,12 @@
 	import { ArrowLeft, Download } from '@lucide/svelte';
 	import { DecisionStatus } from '$lib/types';
 	import { photoUrl } from '$lib/photoUrls';
+	import { guardWeChatDownload } from '$lib/wechat';
+	import WeChatDownloadNotice from '$lib/components/WeChatDownloadNotice.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
+	let wechatDialogEl: HTMLDialogElement | undefined = $state();
 
 	const downloadCount = $derived(
 		data.entries.filter((e) => e.decision !== DecisionStatus.Undecided).length
@@ -46,6 +49,7 @@
 		<a
 			href={resolve('/albums/[id]/download/zip', { id: String(data.album.id) })}
 			class="btn btn-primary self-start"
+			onclick={(e) => guardWeChatDownload(e, wechatDialogEl)}
 		>
 			<Download class="size-4" /> Download ZIP ({downloadCount})
 		</a>
@@ -66,4 +70,6 @@
 			{/each}
 		</ul>
 	{/if}
+
+	<WeChatDownloadNotice bind:dialogEl={wechatDialogEl} />
 </div>

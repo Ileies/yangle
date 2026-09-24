@@ -13,6 +13,8 @@
 	import { SvelteMap } from 'svelte/reactivity';
 	import { formatBytes } from '$lib/utils';
 	import { photoUrl } from '$lib/photoUrls';
+	import { guardWeChatDownload } from '$lib/wechat';
+	import WeChatDownloadNotice from '$lib/components/WeChatDownloadNotice.svelte';
 	import { DecisionStatus, type Photo } from '$lib/types';
 
 	let {
@@ -32,6 +34,7 @@
 	} = $props();
 
 	let dialogEl: HTMLDialogElement | undefined = $state();
+	let wechatDialogEl: HTMLDialogElement | undefined = $state();
 	let viewportEl: HTMLDivElement | undefined = $state();
 	let showInfo = $state(false);
 	let showButtons = $state(
@@ -364,6 +367,7 @@
 						class="btn btn-square btn-sm btn-outline"
 						title="Download"
 						aria-label="Download photo"
+						onclick={(e) => guardWeChatDownload(e, wechatDialogEl)}
 					>
 						<Download class="size-4" />
 					</a>
@@ -375,3 +379,5 @@
 		</form>
 	{/if}
 </dialog>
+
+<WeChatDownloadNotice bind:dialogEl={wechatDialogEl} />
