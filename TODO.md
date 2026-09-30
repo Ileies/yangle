@@ -23,13 +23,8 @@ Legend: `[x]` done, `[ ]` not started/not finished yet.
       keep/delete zone indicators (optional, low priority)
 - [x] Duplicate-bracket survivors and "keep both" photos reach the current swipe deck without a
       reload (see §3.4)
-- [ ] DX: `/upload/resolve` (and worth spot-checking other POST `+server.ts` handlers) only
-      type-asserts the request body via `as`, with no runtime validation — a malformed body
-      (wrong types, missing fields) fails downstream with a less obvious error instead of a
-      clean 400. Not currently exploitable (the request-body strings all flow through
-      `flattenImageName`/`uniqueImageName`, which already strip path separators before
-      anything touches the filesystem or the ZIP writer), but worth a validation pass
-      (`zod` or manual guards) for clearer failure modes as more endpoints accumulate.
+- [x] DX: validate JSON request bodies in album endpoints and file fields in `/upload/submit`.
+      Malformed JSON, missing fields, and wrong types now return a clean 400.
 
 Verification notes below describe earlier implementation work. The user has since tested
 Bun.Image successfully; the targeted checks above remain pending.
