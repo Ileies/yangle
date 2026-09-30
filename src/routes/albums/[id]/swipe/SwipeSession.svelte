@@ -119,6 +119,7 @@
 		albumId={data.album.id}
 		photos={data.clusters}
 		{onEliminate}
+		onResolved={(photos) => deck.addResolvedPhotos(photos)}
 		onAllResolved={() => (clustersPending = false)}
 	/>
 {:else if deck.current}

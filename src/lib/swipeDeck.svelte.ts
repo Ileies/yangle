@@ -1,4 +1,4 @@
-import { SvelteMap } from 'svelte/reactivity';
+import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import { DecisionStatus, type DeckPhoto } from './types';
 
 // Session-scoped deck state - exists only while /albums/[id]/swipe is mounted. See TODO.md 3.0.
@@ -56,9 +56,10 @@ export class SwipeDeck {
 	history = $state<HistoryEntry[]>([]);
 	counts = $state<SessionCounts>({ keep: 0, delete: 0, favorite: 0 });
 	toastMessage = $state<string | null>(null);
-	readonly total: number;
+	total = $state(0);
 
 	#albumId: number;
+	#knownPhotoIds: SvelteSet<number>;
 	#statusByPhoto = new SvelteMap<number, DecisionStatus>();
 	#pendingBatch: { photoId: number; status: DecisionStatus }[] = [];
 	#flushTimer: ReturnType<typeof setTimeout> | null = null;
@@ -67,6 +68,19 @@ export class SwipeDeck {
 		this.#albumId = albumId;
 		this.queue = initialQueue;
 		this.total = total;
+		this.#knownPhotoIds = new SvelteSet(initialQueue.map((photo) => photo.id));
+	}
+
+	addResolvedPhotos(photos: DeckPhoto[]): void {
+		const added: DeckPhoto[] = [];
+		for (const photo of photos) {
+			if (this.#knownPhotoIds.has(photo.id)) continue;
+			this.#knownPhotoIds.add(photo.id);
+			added.push(photo);
+		}
+		if (added.length === 0) return;
+		this.queue = [...this.queue, ...added];
+		this.total += added.length;
 	}
 
 	get current(): DeckPhoto | undefined {

@@ -16,11 +16,13 @@
 		albumId,
 		photos,
 		onEliminate,
+		onResolved,
 		onAllResolved
 	}: {
 		albumId: number;
 		photos: DeckPhoto[];
 		onEliminate: (photo: DeckPhoto) => void;
+		onResolved: (photos: DeckPhoto[]) => void;
 		onAllResolved: () => void;
 	} = $props();
 
@@ -76,9 +78,12 @@
 	}
 
 	function finishRound(): void {
-		if (roundWinners.length <= 1) {
-			const survivor = roundWinners[0] ?? roundContestants[0];
-			if (survivor) void resolveSurvivor(survivor);
+		if (roundWinners.length === 0) {
+			completeCluster();
+			return;
+		}
+		if (roundWinners.length === 1) {
+			void resolveSurvivor(roundWinners[0]);
 			return;
 		}
 		roundContestants = pairDuplicatesBySimilarity(roundWinners);
@@ -124,6 +129,7 @@
 			return;
 		}
 		resolving = false;
+		onResolved([a, b]);
 		advancePair();
 	}
 
@@ -155,6 +161,11 @@
 			return;
 		}
 		resolving = false;
+		onResolved([photo]);
+		completeCluster();
+	}
+
+	function completeCluster(): void {
 		if (clusterIdx + 1 < clusters.length) startCluster(clusterIdx + 1);
 		else onAllResolved();
 	}

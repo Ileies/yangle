@@ -21,8 +21,8 @@ Legend: `[x]` done, `[ ]` not started/not finished yet.
 - [ ] Sharing: `live` resolveMode for `together`-mode albums — Phase 2+, needs SSE infra (§5)
 - [ ] Design language: evaluate echoing the yin-yang curve behind the swipe deck's own
       keep/delete zone indicators (optional, low priority)
-- [ ] Bug: duplicate-bracket survivor doesn't reach the current session's swipe deck without a
-      full reload — see §3.4's writeup for the fix shape
+- [x] Duplicate-bracket survivors and "keep both" photos reach the current swipe deck without a
+      reload (see §3.4)
 - [ ] DX: `/upload/resolve` (and worth spot-checking other POST `+server.ts` handlers) only
       type-asserts the request body via `as`, with no runtime validation — a malformed body
       (wrong types, missing fields) fails downstream with a less obvious error instead of a
@@ -307,20 +307,12 @@ reach the swipe deck.
       immediately via the same decisions-write path as a normal swipe (revisable later like any
       other decision). Last-photo-standing gets `duplicateResolved: true` server-side. Progress
       indicator across the whole multi-cluster resolution phase ("Round 2 of 3 · burst 4 of 7").
-- [ ] **Bug**: a bracket survivor (or a "keep both" pair) is marked `duplicateResolved: true` in
-      the DB but never actually reaches the _current session's_ swipe deck — `SwipeSession.svelte`
-      constructs `SwipeDeck` once at mount from the `load`'s pre-bracket queue/total, and
-      `onAllResolved` (`SwipeSession.svelte`, wired to `DuplicateBracket`'s `resolveSurvivor`/
-      `resolveKeepBoth`) only flips `clustersPending = false` — nothing pushes the resolved
-      photo into `deck.queue`, and `deck.total` is `readonly` so it can't just be bumped in
-      place either. If an album's remaining unresolved photos are entirely inside one cluster,
-      finishing the bracket falls straight to the "nothing to swipe" empty state even though a
-      photo is now undecided in the DB — invisible until a full page reload. Needs either: (a)
-      `DuplicateBracket` reporting resolved survivor(s) up through a new callback so
-      `SwipeSession` can append to `deck.queue` and bump `deck.total`/`SwipeDeck`'s total
-      handling to allow growth, or (b) `invalidateAll()` after the bracket completes and
-      `SwipeDeck` re-syncing off fresh `load` data instead of only reading it once at
-      construction.
+- [x] **Current-session handoff**: `DuplicateBracket` reports each resolved survivor or "keep
+      both" pair to `SwipeSession`, which appends them to the live `SwipeDeck` queue and updates
+      its total. A round where every pair chooses "keep both" completes without re-resolving a
+      photo. Verified in an isolated browser session with an album containing only one pair:
+      the survivor appeared as a 0/1 deck, and "keep both" yielded two swipeable cards in a 0/2
+      deck without reloading.
 - [x] **Design language**: the divider is a gentle S-curve (SVG `<path>`/`clip-path`), not
       straight — the curve's midpoint follows the drag position, control points scale with the
       drag offset rather than degenerating into a straight line at the extremes.
