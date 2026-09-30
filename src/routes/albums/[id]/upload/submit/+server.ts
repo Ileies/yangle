@@ -17,8 +17,17 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 	const role = await getAlbumRole(albumId, locals.user.email);
 	if (!canContribute(role)) error(403, 'No upload access to this album');
 
-	const form = await request.formData();
-	const files = form.getAll('files').filter((entry): entry is File => entry instanceof File);
+	let form: FormData;
+	try {
+		form = await request.formData();
+	} catch {
+		error(400, 'Invalid upload form');
+	}
+	const entries = form.getAll('files');
+	if (entries.length === 0 || !entries.every((entry): entry is File => entry instanceof File)) {
+		error(400, 'Expected one or more image files');
+	}
+	const files = entries;
 
 	const added = [];
 	const burstCandidates: BurstCandidate<Photo>[] = [];

@@ -1,6 +1,7 @@
 import { error, json } from '@sveltejs/kit';
 import { z } from 'zod';
 import { addOrUpdateShare, removeShare, requireAlbumAccess } from '$lib/server/albums';
+import { parseJsonBody } from '$lib/server/jsonBody';
 import { sendAlbumShareEmail } from '$lib/server/mail';
 import { AlbumRole } from '$lib/types';
 import type { RequestHandler } from './$types';
@@ -21,9 +22,7 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 	const albumId = Number(params.id);
 	const album = await requireOwner(albumId, locals.user.email);
 
-	const body = shareSchema.safeParse(await request.json());
-	if (!body.success) error(400, 'Invalid email or role');
-	const { email, role } = body.data;
+	const { email, role } = await parseJsonBody(request, shareSchema, 'Invalid email or role');
 	if (email === locals.user.email) error(400, 'You already own this album');
 
 	await addOrUpdateShare(albumId, email, role);
@@ -37,9 +36,8 @@ export const DELETE: RequestHandler = async ({ params, request, locals }) => {
 	const albumId = Number(params.id);
 	await requireOwner(albumId, locals.user.email);
 
-	const body = z.object({ email: z.email() }).safeParse(await request.json());
-	if (!body.success) error(400, 'Invalid email');
+	const body = await parseJsonBody(request, z.object({ email: z.email() }), 'Invalid email');
 
-	await removeShare(albumId, body.data.email);
+	await removeShare(albumId, body.email);
 	return json({ ok: true });
 };

@@ -1,6 +1,7 @@
 import { error, json } from '@sveltejs/kit';
 import { z } from 'zod';
 import { getAlbumRole, revokeInviteLink, setInviteLink } from '$lib/server/albums';
+import { parseJsonBody } from '$lib/server/jsonBody';
 import { AlbumRole } from '$lib/types';
 import type { RequestHandler } from './$types';
 
@@ -14,12 +15,13 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 	const albumId = Number(params.id);
 	await requireOwner(albumId, locals.user.email);
 
-	const body = z
-		.object({ role: z.enum([AlbumRole.Contributor, AlbumRole.Viewer]) })
-		.safeParse(await request.json());
-	if (!body.success) error(400, 'Invalid role');
+	const body = await parseJsonBody(
+		request,
+		z.object({ role: z.enum([AlbumRole.Contributor, AlbumRole.Viewer]) }),
+		'Invalid role'
+	);
 
-	const token = await setInviteLink(albumId, body.data.role);
+	const token = await setInviteLink(albumId, body.role);
 	return json({ token });
 };
 

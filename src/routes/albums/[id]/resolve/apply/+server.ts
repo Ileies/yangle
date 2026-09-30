@@ -2,6 +2,7 @@ import { error, json } from '@sveltejs/kit';
 import { z } from 'zod';
 import { listParticipants, requireAlbumAccess } from '$lib/server/albums';
 import { applyDecisionToAll } from '$lib/server/decisions';
+import { parseJsonBody } from '$lib/server/jsonBody';
 import { getPhotoInAlbum } from '$lib/server/photos';
 import { DecisionMode, DecisionStatus } from '$lib/types';
 import type { RequestHandler } from './$types';
@@ -23,14 +24,13 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 		error(400, 'This album is not in "together" decision mode');
 	}
 
-	const body = bodySchema.safeParse(await request.json());
-	if (!body.success) error(400, 'Invalid photoId or status');
+	const body = await parseJsonBody(request, bodySchema, 'Invalid photoId or status');
 
-	const photo = await getPhotoInAlbum(albumId, body.data.photoId);
+	const photo = await getPhotoInAlbum(albumId, body.photoId);
 	if (!photo) error(404, 'Photo not found');
 
 	const participants = await listParticipants(albumId);
-	await applyDecisionToAll(participants, body.data.photoId, body.data.status);
+	await applyDecisionToAll(participants, body.photoId, body.status);
 
 	return json({ ok: true });
 };

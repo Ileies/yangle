@@ -1,8 +1,16 @@
 import { error, json } from '@sveltejs/kit';
+import { z } from 'zod';
 import { canContribute, getAlbumRole } from '$lib/server/albums';
 import { flattenImageName, uniqueImageName } from '$lib/imageNames';
+import { parseJsonBody } from '$lib/server/jsonBody';
 import { getPhoto, listPhotoNames, recordNameVariant, setDisplayName } from '$lib/server/photos';
 import type { RequestHandler } from './$types';
+
+const resolveSchema = z.object({
+	photoId: z.number().int().positive(),
+	keepName: z.string().min(1),
+	otherName: z.string().min(1)
+});
 
 // Resolves a name conflict surfaced by /upload/check: same content hash already in the
 // album under `photo.displayName`, but the file just selected was named `otherName`.
@@ -14,11 +22,11 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 	const role = await getAlbumRole(albumId, locals.user.email);
 	if (!canContribute(role)) error(403, 'No upload access to this album');
 
-	const { photoId, keepName, otherName } = (await request.json()) as {
-		photoId: number;
-		keepName: string;
-		otherName: string;
-	};
+	const { photoId, keepName, otherName } = await parseJsonBody(
+		request,
+		resolveSchema,
+		'Invalid photoId or names'
+	);
 
 	const photo = await getPhoto(photoId);
 	if (!photo || photo.albumId !== albumId) error(404, 'Photo not found');

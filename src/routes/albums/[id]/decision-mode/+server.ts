@@ -1,6 +1,7 @@
 import { error, json } from '@sveltejs/kit';
 import { z } from 'zod';
 import { requireAlbumAccess, updateDecisionSettings } from '$lib/server/albums';
+import { parseJsonBody } from '$lib/server/jsonBody';
 import { AlbumRole, DecisionMode, ResolveMode } from '$lib/types';
 import type { RequestHandler } from './$types';
 
@@ -15,9 +16,8 @@ export const PATCH: RequestHandler = async ({ params, request, locals }) => {
 	const { role } = await requireAlbumAccess(albumId, locals.user.email);
 	if (role !== AlbumRole.Owner) error(403, 'Only the album owner can do this');
 
-	const body = settingsSchema.safeParse(await request.json());
-	if (!body.success) error(400, 'Invalid decision settings');
+	const body = await parseJsonBody(request, settingsSchema, 'Invalid decision settings');
 
-	await updateDecisionSettings(albumId, body.data.decisionMode, body.data.resolveMode);
+	await updateDecisionSettings(albumId, body.decisionMode, body.resolveMode);
 	return json({ ok: true });
 };

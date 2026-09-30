@@ -1,7 +1,11 @@
 import { error, json } from '@sveltejs/kit';
+import { z } from 'zod';
 import { canContribute, getAlbumRole } from '$lib/server/albums';
+import { parseJsonBody } from '$lib/server/jsonBody';
 import { deletePhotos } from '$lib/server/photos';
 import type { RequestHandler } from './$types';
+
+const photoIdsSchema = z.array(z.number().int().positive());
 
 // Bulk hard-delete from the album overview's multi-select. Unlike a decision status (per-user,
 // reversible), this removes the row and every file rendition for everyone - so it's gated to
@@ -16,10 +20,7 @@ export const DELETE: RequestHandler = async ({ params, request, locals }) => {
 	if (!role) error(403, 'No access to this album');
 	if (!canContribute(role)) error(403, 'Only contributors can delete photos');
 
-	const body = await request.json();
-	if (!Array.isArray(body) || !body.every((id) => Number.isInteger(id))) {
-		error(400, 'Expected an array of photo IDs');
-	}
+	const body = await parseJsonBody(request, photoIdsSchema, 'Expected an array of photo IDs');
 
 	await deletePhotos(albumId, body);
 	return json({ ok: true });
