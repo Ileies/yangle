@@ -13,7 +13,7 @@ Legend: `[x]` done, `[ ]` not started/not finished yet.
 - [ ] Complete targeted migration checks for duplicate grouping across colour profiles, portrait
       orientation, preview/thumbnail generation and compatibility downloads.
 - [ ] Restore HEIC/HEIF and AVIF uploads on Linux when a suitable Bun codec becomes available.
-- [ ] PWA manifest (§0)
+- [x] PWA manifest (§0)
 - [ ] HEIC real-device decode-performance test, and a download UI that distinguishes
       "original (HEIC)" vs. "compatible (JPEG)" instead of silently picking one (§2)
 - [ ] Swipe deck: real-device orientation test matrix (§3.3) and performance targets + full
@@ -40,7 +40,7 @@ Bun.Image successfully; the targeted checks above remain pending.
 
 - [x] SvelteKit 2 + Svelte 5 (runes) + Bun, Tailwind 4 + DaisyUI 5, Drizzle/SQLite,
       `@sveltejs/adapter-node`, Nix dev shell, type-check/lint/format all clean
-- [ ] PWA manifest (`static/manifest.webmanifest` + icons + `<link rel="manifest">` in
+- [x] PWA manifest (`static/manifest.webmanifest` + icons + `<link rel="manifest">` in
       `app.html`) — cheap to add and buys the "installed app" feel (home-screen icon, no
       browser chrome) that matters a lot for a swipe-heavy full-screen mobile UI. Not full
       offline support (there's nothing meaningful to do offline here, the app is inherently

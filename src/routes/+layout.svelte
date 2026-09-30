@@ -1,6 +1,5 @@
 <script lang="ts">
 	import '../app.css';
-	import favicon from '$lib/assets/favicon.svg';
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import { Images, CircleUser, Layers } from '@lucide/svelte';
@@ -20,10 +19,6 @@
 	let onAlbums = $derived(page.url.pathname.startsWith(albumsHref) && !onSwipe);
 	let onProfile = $derived(page.url.pathname.startsWith(profileHref));
 </script>
-
-<svelte:head>
-	<link rel="icon" href={favicon} />
-</svelte:head>
 
 <div class="flex h-dvh flex-col">
 	<div class="flex-1 overflow-y-auto">

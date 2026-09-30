@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+	<title>Yangle</title>
+	<rect width="512" height="512" fill="#1e293b" />
+	<rect x="144" y="112" width="224" height="288" rx="40" fill="#ffffff" />
+	<path
+		d="M190 190L256 266L322 190M256 266V332"
+		fill="none"
+		stroke="#1e293b"
+		stroke-linecap="round"
+		stroke-linejoin="round"
+		stroke-width="30"
+	/>
+	<circle cx="190" cy="190" r="15" fill="#f87171" />
+	<circle cx="322" cy="190" r="15" fill="#34d399" />
+</svg>
