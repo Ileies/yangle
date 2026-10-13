@@ -13,6 +13,7 @@ import {
 	photosToDownload,
 	recordDownloadBatch
 } from '$lib/server/downloads';
+import { parseDownloadFormat, zipSourceFor } from '$lib/server/downloadFormat';
 import { storagePath } from '$lib/server/storage';
 import type { RequestHandler } from './$types';
 
@@ -33,7 +34,7 @@ function uniqueZipName(used: Set<string>, displayName: string, photoId: number):
 	return name;
 }
 
-export const GET: RequestHandler = async ({ params, locals }) => {
+export const GET: RequestHandler = async ({ params, locals, url }) => {
 	if (!locals.user) redirect(303, '/login');
 
 	const albumId = Number(params.id);
@@ -55,6 +56,7 @@ export const GET: RequestHandler = async ({ params, locals }) => {
 		photos.map((photo) => photo.id)
 	);
 	const used = new Set<string>();
+	const format = parseDownloadFormat(url.searchParams.get('format'));
 
 	// Save a complete archive before serving it. A stable file size and URL let iOS resume
 	// interrupted downloads with HTTP range requests. Originals are read one at a time.
@@ -71,10 +73,9 @@ export const GET: RequestHandler = async ({ params, locals }) => {
 
 			(async () => {
 				for (const photo of photos) {
-					const bytes = new Uint8Array(
-						await Bun.file(storagePath(photo.originalPath)).arrayBuffer()
-					);
-					const name = uniqueZipName(used, photo.displayName, photo.id);
+					const source = zipSourceFor(photo, format);
+					const bytes = new Uint8Array(await Bun.file(storagePath(source.path)).arrayBuffer());
+					const name = uniqueZipName(used, source.name, photo.id);
 					const entry = new ZipPassThrough(name);
 					zip.add(entry);
 					entry.push(bytes, true);

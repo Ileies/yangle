@@ -14,6 +14,15 @@
 		data.entries.filter((e) => e.decision !== DecisionStatus.Undecided).length
 	);
 
+	let format: 'original' | 'compatible' = $state('original');
+
+	// Only offer a choice when it changes something: HEIC/HEIF photos carry a JPEG rendition.
+	const compatibleCount = $derived(
+		data.entries.filter(
+			(e) => e.decision !== DecisionStatus.Undecided && e.photo.compatOriginalPath !== null
+		).length
+	);
+
 	function badgeLabel(badge: (typeof data.entries)[number]['badge']): string {
 		if (badge === 'downloaded') return 'downloaded';
 		if (badge === 'new') return 'new';
@@ -46,8 +55,41 @@
 			Nothing to download yet — keep or favorite some photos first.
 		</p>
 	{:else}
+		{#if compatibleCount > 0}
+			<fieldset class="flex flex-col gap-2">
+				<legend class="mb-1 text-sm text-base-content/60">
+					{compatibleCount} HEIC {compatibleCount === 1 ? 'photo' : 'photos'} in this download
+				</legend>
+				<label class="flex cursor-pointer items-start gap-2 text-sm">
+					<input
+						type="radio"
+						name="format"
+						value="original"
+						class="radio radio-sm mt-0.5"
+						bind:group={format}
+					/>
+					<span>
+						<span class="font-medium">Original (HEIC)</span><br />
+						<span class="text-base-content/60">Untouched files, best for Apple devices.</span>
+					</span>
+				</label>
+				<label class="flex cursor-pointer items-start gap-2 text-sm">
+					<input
+						type="radio"
+						name="format"
+						value="compatible"
+						class="radio radio-sm mt-0.5"
+						bind:group={format}
+					/>
+					<span>
+						<span class="font-medium">Compatible (JPEG)</span><br />
+						<span class="text-base-content/60">Opens everywhere, e.g. Windows and Android.</span>
+					</span>
+				</label>
+			</fieldset>
+		{/if}
 		<a
-			href={resolve('/albums/[id]/download/zip', { id: String(data.album.id) })}
+			href="{resolve('/albums/[id]/download/zip', { id: String(data.album.id) })}?format={format}"
 			class="btn btn-primary self-start"
 			onclick={(e) => guardWeChatDownload(e, wechatDialogEl)}
 		>
