@@ -14,8 +14,8 @@ Legend: `[x]` done, `[ ]` not started/not finished yet.
       orientation, preview/thumbnail generation and compatibility downloads.
 - [ ] Restore HEIC/HEIF and AVIF uploads on Linux when a suitable Bun codec becomes available.
 - [x] PWA manifest (§0)
-- [ ] HEIC real-device decode-performance test, and a download UI that distinguishes
-      "original (HEIC)" vs. "compatible (JPEG)" instead of silently picking one (§2)
+- [ ] HEIC real-device decode-performance test (§2)
+- [x] Download UI distinguishes "original (HEIC)" vs. "compatible (JPEG)" (§2, §6)
 - [ ] Swipe deck: real-device orientation test matrix (§3.3) and performance targets + full
       device test matrix (§3.9) — both need actual phones, not curl/devtools
 - [ ] Sharing: `live` resolveMode for `together`-mode albums — Phase 2+, needs SSE infra (§5)
@@ -83,9 +83,9 @@ the session immediately.
       rendition while preserving the original bytes. Previously stored originals and renditions
       remain downloadable on all platforms.
   - [ ] Confirm Bun.Image's HEIC decode performance on a supported host under real upload volume.
-  - [ ] Download UI (§6) should distinguish "original (HEIC)" vs. "compatible (JPEG)" when
-        `compatOriginalPath` is set, rather than silently picking one — the ZIP download
-        currently always ships the true original
+  - [x] Download UI (§6) distinguishes "original (HEIC)" vs. "compatible (JPEG)" when
+        `compatOriginalPath` is set: the download page shows a format choice and passes
+        `?format=original|compatible` to the ZIP route (default `original`)
 - [x] **`/` (homepage)**: no real landing page for the MVP — `+page.server.ts` just redirects
       straight to `/albums` (logged in) or `/login` (logged out).
 - [x] **`/albums`** — list albums the user owns or is shared on (`listAlbumsFor()` in
