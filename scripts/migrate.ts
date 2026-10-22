@@ -4,7 +4,7 @@ import { migrate } from 'drizzle-orm/bun-sqlite/migrator';
 import { mkdirSync } from 'node:fs';
 import { getStoragePaths } from '../src/lib/server/storageConfig';
 
-const storage = getStoragePaths(process.env.STORAGE_DIR);
+const storage = getStoragePaths(process.env.DATA_DIR);
 mkdirSync(storage.directory, { recursive: true });
 const sqlite = new Database(storage.database);
 try {

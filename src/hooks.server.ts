@@ -5,9 +5,7 @@ import { ensureStorageDirectories } from '$lib/server/storageDirectories';
 import { SESSION_COOKIE } from '$lib/constants';
 import { getStoragePaths } from '$lib/server/storageConfig';
 
-const storageDirectoriesReady = ensureStorageDirectories(
-	getStoragePaths(env.STORAGE_DIR).directory
-);
+const storageDirectoriesReady = ensureStorageDirectories(getStoragePaths(env.DATA_DIR).directory);
 
 export const handle: Handle = async ({ event, resolve }) => {
 	await storageDirectoriesReady;

@@ -3,7 +3,7 @@ import { mkdirSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
 import { getStoragePaths } from './src/lib/server/storageConfig';
 
-const storage = getStoragePaths(process.env.STORAGE_DIR);
+const storage = getStoragePaths(process.env.DATA_DIR);
 mkdirSync(storage.directory, { recursive: true });
 
 export default defineConfig({

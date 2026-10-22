@@ -87,7 +87,7 @@ if [[ $(id -u) != 0 ]]; then sudo -n -l systemctl stop ${service} >/dev/null; su
 	try {
 		await run(['rsync', ...sync, '--', 'build/', dest]);
 		await remote(
-			`cd ${target}\nstorage_dir=$(systemctl show ${service} -p Environment --value | xargs -r -n 1 printf '%s\\n' | sed -n 's/^STORAGE_DIR=//p')\nif [[ -n $storage_dir ]]; then export STORAGE_DIR="$storage_dir"; else unset STORAGE_DIR; fi\nbun ./migrate.js`
+			`cd ${target}\ndata_dir=$(systemctl show ${service} -p Environment --value | xargs -r -n 1 printf '%s\\n' | sed -n 's/^DATA_DIR=//p')\nif [[ -n $data_dir ]]; then export DATA_DIR="$data_dir"; else unset DATA_DIR; fi\nbun ./migrate.js`
 		);
 	} catch (error) {
 		failure = error;

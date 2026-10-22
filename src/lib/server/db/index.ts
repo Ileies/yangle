@@ -5,7 +5,7 @@ import { env } from '$env/dynamic/private';
 import { mkdirSync } from 'node:fs';
 import { getStoragePaths } from '$lib/server/storageConfig';
 
-const storage = getStoragePaths(env.STORAGE_DIR);
+const storage = getStoragePaths(env.DATA_DIR);
 mkdirSync(storage.directory, { recursive: true });
 
 // bun:sqlite doesn't enforce FKs by default - without this, every `onDelete: cascade` in

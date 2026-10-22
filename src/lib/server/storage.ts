@@ -11,7 +11,7 @@ import type { BurstFingerprint } from '$lib/server/burstSimilarity';
 import { getStoragePaths } from '$lib/server/storageConfig';
 
 export function storagePath(...segments: string[]): string {
-	return path.join(getStoragePaths(env.STORAGE_DIR).directory, ...segments);
+	return path.join(getStoragePaths(env.DATA_DIR).directory, ...segments);
 }
 
 // 8x8 difference hash. This is only the cheap first pass for burst candidates; SSIM and color
