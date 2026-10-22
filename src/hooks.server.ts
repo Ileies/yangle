@@ -3,9 +3,11 @@ import { env } from '$env/dynamic/private';
 import { getSessionUser } from '$lib/server/auth';
 import { ensureStorageDirectories } from '$lib/server/storageDirectories';
 import { SESSION_COOKIE } from '$lib/constants';
+import { getStoragePaths } from '$lib/server/storageConfig';
 
-if (!env.STORAGE_DIR) throw new Error('STORAGE_DIR is not set');
-const storageDirectoriesReady = ensureStorageDirectories(env.STORAGE_DIR);
+const storageDirectoriesReady = ensureStorageDirectories(
+	getStoragePaths(env.STORAGE_DIR).directory
+);
 
 export const handle: Handle = async ({ event, resolve }) => {
 	await storageDirectoriesReady;

@@ -68,10 +68,22 @@ easiest way to develop locally.
 
 | Variable                                                            | Purpose                                                                                                                                                                                                                                                             |
 | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `DATABASE_URL`                                                      | Path to the SQLite file (e.g. `local.db`)                                                                                                                                                                                                                           |
-| `STORAGE_DIR`                                                       | Where uploaded originals/previews/thumbnails/ZIPs are written on disk                                                                                                                                                                                               |
+| `STORAGE_DIR`                                                       | Root for all persistent data: `local.db`, originals, previews, thumbnails and ZIPs. Defaults to `storage/`. Relative to the working directory, or an absolute path such as `/var/lib/yangle`.                                                                       |
 | `ORIGIN`                                                            | Public app origin used to build absolute links in emails; defaults to `http://localhost:5173` in development                                                                                                                                                        |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM` | SMTP creds for sending real magic-link emails. Leave blank in dev — see above. `SMTP_FROM`'s domain must have SPF/DKIM authorization on that SMTP account, or receiving providers will silently spam-filter or drop the mail even though your server "accepted" it. |
+
+The app, Drizzle CLI and bundled production migrations all use the same `STORAGE_DIR`.
+The directory is created automatically. To separate data from code, set this in `.env`:
+
+```dotenv
+STORAGE_DIR=/var/lib/yangle
+```
+
+When upgrading an existing installation, stop the app, move the old root-level `local.db`
+into the storage directory (including any `local.db-wal`, `local.db-shm` or `local.db-journal`
+sidecars), and remove `DATABASE_URL` from the environment. It is no longer used. To change
+`STORAGE_DIR` later, move the entire data directory to the new location before restarting;
+stored photo paths are relative to it. Run `bun run db:migrate` after configuring the path.
 
 ### Scripts
 
@@ -104,10 +116,12 @@ The target must have `yangle.service` configured to run `bun ./index.js` with wo
 Run as root or grant passwordless sudo for `systemctl stop yangle.service` and
 `systemctl restart yangle.service`. SSH deployments also need write access to the target.
 
-Production environment variables are configured in the target NixOS systemd service. SQLite
+Production environment variables can be configured in `.env` in the runtime directory or in
+the target NixOS systemd service; service variables take precedence. SQLite
 databases, uploads, and backups stay on the server; rsync only updates generated runtime files
-and asset/migration directories. Relative database and storage paths resolve inside
-`/var/www/yangle`. The script builds before stopping the service, syncs the build, applies
+and asset/migration directories. Relative `STORAGE_DIR` paths resolve inside
+`/var/www/yangle`; use an absolute path to keep all data outside the deployment directory.
+The script builds before stopping the service, syncs the build, applies
 bundled Drizzle migrations using the target service environment, restarts systemd, and checks
 HTTP on port 3007. A failed sync or migration exits with an error and attempts to restart the
 service. Back up the production database before schema changes.
@@ -183,7 +197,7 @@ src/
       downloads.ts               — ZIP download batches + per-photo download tracking
   routes/                — SvelteKit routes (pages + API endpoints)
   hooks.server.ts        — reads session cookie → `event.locals.user`
-storage/                 — gitignored, local disk storage (originals/previews/thumbnails/zips)
+storage/                 - gitignored data directory (local.db, originals/previews/thumbnails/zips)
 drizzle/                 — generated SQL migrations
 ```
 

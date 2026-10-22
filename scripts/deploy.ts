@@ -87,7 +87,7 @@ if [[ $(id -u) != 0 ]]; then sudo -n -l systemctl stop ${service} >/dev/null; su
 	try {
 		await run(['rsync', ...sync, '--', 'build/', dest]);
 		await remote(
-			`cd ${target}\ndatabase_url=$(systemctl show ${service} -p Environment --value | tr ' ' '\\n' | sed -n 's/^DATABASE_URL=//p')\nif [[ -z $database_url ]]; then echo 'DATABASE_URL is missing from the systemd service environment.' >&2; exit 1; fi\nDATABASE_URL="$database_url" bun ./migrate.js`
+			`cd ${target}\nstorage_dir=$(systemctl show ${service} -p Environment --value | xargs -r -n 1 printf '%s\\n' | sed -n 's/^STORAGE_DIR=//p')\nif [[ -n $storage_dir ]]; then export STORAGE_DIR="$storage_dir"; else unset STORAGE_DIR; fi\nbun ./migrate.js`
 		);
 	} catch (error) {
 		failure = error;

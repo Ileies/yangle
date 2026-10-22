@@ -8,10 +8,10 @@ import { IMAGE_QUALITY, PREVIEW_MAX_PX, THUMBNAIL_MAX_PX } from '$lib/constants'
 import { Orientation } from '$lib/types';
 import { sha256Hex } from '$lib/utils';
 import type { BurstFingerprint } from '$lib/server/burstSimilarity';
+import { getStoragePaths } from '$lib/server/storageConfig';
 
 export function storagePath(...segments: string[]): string {
-	if (!env.STORAGE_DIR) throw new Error('STORAGE_DIR is not set');
-	return path.join(env.STORAGE_DIR, ...segments);
+	return path.join(getStoragePaths(env.STORAGE_DIR).directory, ...segments);
 }
 
 // 8x8 difference hash. This is only the cheap first pass for burst candidates; SSIM and color
