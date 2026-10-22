@@ -104,13 +104,13 @@ The target must have `yangle.service` configured to run `bun ./index.js` with wo
 Run as root or grant passwordless sudo for `systemctl stop yangle.service` and
 `systemctl restart yangle.service`. SSH deployments also need write access to the target.
 
-Production `.env`, SQLite databases, uploads, and backups stay on the server; rsync only
-updates generated runtime files and asset/migration directories. `DATABASE_URL`, `STORAGE_DIR`,
-`ORIGIN`, and SMTP settings are read at runtime from the target environment. Relative database
-and storage paths resolve inside `/var/www/yangle`. The script builds before stopping the
-service, syncs the build, applies bundled Drizzle migrations using the target `.env`, restarts
-systemd, and checks HTTP on port 3007. A failed sync or migration exits with an error and
-attempts to restart the service. Back up the production database before schema changes.
+Production environment variables are configured in the target NixOS systemd service. SQLite
+databases, uploads, and backups stay on the server; rsync only updates generated runtime files
+and asset/migration directories. Relative database and storage paths resolve inside
+`/var/www/yangle`. The script builds before stopping the service, syncs the build, applies
+bundled Drizzle migrations using the target service environment, restarts systemd, and checks
+HTTP on port 3007. A failed sync or migration exits with an error and attempts to restart the
+service. Back up the production database before schema changes.
 
 ## NixOS notes
 
