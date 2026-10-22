@@ -1,6 +1,7 @@
 #!/usr/bin/env bun
-import { hostname } from 'node:os';
-import { dirname, resolve } from 'node:path';
+import { hostname, tmpdir } from 'node:os';
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const target = '/var/www/yangle';
@@ -25,23 +26,43 @@ for (let i = 0; i < cliArgs.length; i++) {
 	}
 }
 
-async function run(command: string[], input?: string): Promise<void> {
+async function run(command: string[], input?: string, capture = false): Promise<string> {
 	const proc = Bun.spawn(command, {
 		cwd: project,
 		stdin: input === undefined ? 'inherit' : new Blob([input]),
-		stdout: 'inherit',
+		stdout: capture ? 'pipe' : 'inherit',
 		stderr: 'inherit'
 	});
+	const output = capture ? await new Response(proc.stdout).text() : '';
 	const code = await proc.exited;
 	if (code !== 0) throw new Error(`Command failed (${code}): ${command.join(' ')}`);
+	return output.trim();
 }
-function remote(script: string): Promise<void> {
-	if (host === 'local') return run(['bash', '-seuo', 'pipefail'], script);
+function remote(script: string, capture = false): Promise<string> {
+	if (host === 'local') return run(['bash', '-seuo', 'pipefail'], script, capture);
 	const destination = host === 'ros' ? 'root@rizinos.com' : host;
 	return run(
 		['ssh', '-F', '/dev/null', '-o', 'ConnectTimeout=10', '--', destination, 'bash -seuo pipefail'],
-		script
+		script,
+		capture
 	);
+}
+
+function quote(value: string): string {
+	return `'${value.replaceAll("'", "'\\''")}'`;
+}
+
+function databaseCommand(action: 'snapshot' | 'install', token: string): string {
+	const helper = readFileSync(new URL('./deployDatabase.ts', import.meta.url), 'utf8');
+	return `cd ${target}
+data_dir=$(systemctl show ${service} -p Environment --value | xargs -r -n 1 printf '%s\\n' | sed -n 's/^DATA_DIR=//p')
+if [[ -n $data_dir ]]; then export DATA_DIR="$data_dir"; else unset DATA_DIR; fi
+bun --eval ${quote(`${helper}\ndeployDatabase(${JSON.stringify(action)}, ${JSON.stringify(token)});`)}`;
+}
+
+function databaseLocation(path: string): string {
+	if (host === 'local') return path;
+	return `${host === 'ros' ? 'root@rizinos.com' : host}:${path}`;
 }
 
 async function main(): Promise<void> {
@@ -60,7 +81,6 @@ if [[ $(id -u) != 0 ]]; then sudo -n -l systemctl stop ${service} >/dev/null; su
 	const buildStatus = await build.exited;
 	if (buildStatus !== 0) throw new Error(`Build failed (${buildStatus})`);
 	await run(['test', '-f', 'build/index.js']);
-	await run(['test', '-f', 'build/migrate.js']);
 	const sync = [
 		'-az',
 		'--delete',
@@ -68,6 +88,7 @@ if [[ $(id -u) != 0 ]]; then sudo -n -l systemctl stop ${service} >/dev/null; su
 		'--include=/client/***',
 		'--include=/server/***',
 		'--include=/prerendered/***',
+		// Remove artifacts from the previous server-side migration deployment.
 		'--include=/drizzle/***',
 		'--include=/*.js',
 		'--include=/*.js.map',
@@ -79,23 +100,50 @@ if [[ $(id -u) != 0 ]]; then sudo -n -l systemctl stop ${service} >/dev/null; su
 		sync.push('-e', 'ssh -F /dev/null -o ConnectTimeout=10');
 		dest = `${destination}:${target}/`;
 	}
-	if (dryRun) return run(['rsync', ...sync, '--dry-run', '--', 'build/', dest]);
-	await remote(
-		`if [[ $(id -u) == 0 ]]; then systemctl stop ${service}; else sudo -n systemctl stop ${service}; fi`
-	);
+	if (dryRun) {
+		await run(['rsync', ...sync, '--dry-run', '--', 'build/', dest]);
+		console.log(
+			'Would stop production, download its database, migrate locally, upload and restart.'
+		);
+		return;
+	}
+	const scratch = mkdtempSync(join(tmpdir(), 'yangle-deploy-'));
+	const token = crypto.randomUUID();
+	const transfer = ['rsync', '-az', '-s'];
+	if (host !== 'local') transfer.push('-e', 'ssh -F /dev/null -o ConnectTimeout=10');
+	let stopped = false;
 	let failure: unknown;
 	try {
-		await run(['rsync', ...sync, '--', 'build/', dest]);
 		await remote(
-			`cd ${target}\ndata_dir=$(systemctl show ${service} -p Environment --value | xargs -r -n 1 printf '%s\\n' | sed -n 's/^DATA_DIR=//p')\nif [[ -n $data_dir ]]; then export DATA_DIR="$data_dir"; else unset DATA_DIR; fi\nbun ./migrate.js`
+			`if [[ $(id -u) == 0 ]]; then systemctl stop ${service}; else sudo -n systemctl stop ${service}; fi`
 		);
+		stopped = true;
+		const staging: unknown = JSON.parse(await remote(databaseCommand('snapshot', token), true));
+		if (typeof staging !== 'string' || !staging.startsWith('/') || staging.includes('\n')) {
+			throw new Error('Invalid production database path');
+		}
+		console.log(`Production database snapshot: ${staging}/original.db`);
+		const candidate = join(scratch, 'migrated.db');
+		await run([...transfer, '--', databaseLocation(`${staging}/original.db`), candidate]);
+		await run(['bun', 'scripts/migrate.ts', candidate]);
+		await run([...transfer, '--', candidate, databaseLocation(`${staging}/migrated.db`)]);
+		await run(['rsync', ...sync, '--', 'build/', dest]);
+		await remote(databaseCommand('install', token));
 	} catch (error) {
 		failure = error;
+	} finally {
+		try {
+			rmSync(scratch, { recursive: true, force: true });
+		} catch (error) {
+			if (failure === undefined) failure = error;
+		}
 	}
 	try {
-		await remote(
-			`if [[ $(id -u) == 0 ]]; then systemctl restart ${service}; else sudo -n systemctl restart ${service}; fi`
-		);
+		if (stopped) {
+			await remote(
+				`if [[ $(id -u) == 0 ]]; then systemctl restart ${service}; else sudo -n systemctl restart ${service}; fi`
+			);
+		}
 	} catch (error) {
 		if (failure === undefined) failure = error;
 	}

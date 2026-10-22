@@ -8,7 +8,7 @@
 	},
 	"scripts": {
 		"dev": "bun --bun vite dev",
-		"build": "bun --bun vite build && bun build scripts/migrate.ts --target bun --outfile build/migrate.js && cp -R drizzle build/drizzle",
+		"build": "bun --bun vite build",
 		"deploy": "bun scripts/deploy.ts",
 		"preview": "vite preview",
 		"start": "bun build/index.js",

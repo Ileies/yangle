@@ -72,7 +72,7 @@ easiest way to develop locally.
 | `ORIGIN`                                                            | Public app origin used to build absolute links in emails; defaults to `http://localhost:5173` in development                                                                                                                                                        |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM` | SMTP creds for sending real magic-link emails. Leave blank in dev — see above. `SMTP_FROM`'s domain must have SPF/DKIM authorization on that SMTP account, or receiving providers will silently spam-filter or drop the mail even though your server "accepted" it. |
 
-The app, Drizzle CLI and bundled production migrations all use the same `DATA_DIR`.
+The app, Drizzle CLI and deployment database backups all use the same `DATA_DIR`.
 The directory is created automatically. To separate data from code, set this in `.env`:
 
 ```dotenv
@@ -102,7 +102,7 @@ stored photo paths are relative to it. Run `bun run db:migrate` after configurin
 
 The source checkout on the server lives at `/projects/private/yangle`. Production runs from
 `/var/www/yangle/index.js`; the contents of `build/` are synced directly into that directory.
-The build includes dependencies and migrations, so the target needs Bun and rsync but no Git
+The build includes dependencies, so the target needs Bun and rsync but no Git
 checkout, package installation, or PM2. Install source dependencies with
 `bun install --frozen-lockfile` before building.
 
@@ -117,14 +117,27 @@ Run as root or grant passwordless sudo for `systemctl stop yangle.service` and
 `systemctl restart yangle.service`. SSH deployments also need write access to the target.
 
 Production environment variables can be configured in `.env` in the runtime directory or in
-the target NixOS systemd service; service variables take precedence. SQLite
-databases, uploads, and backups stay on the server; rsync only updates generated runtime files
-and asset/migration directories. Relative `DATA_DIR` paths resolve inside
+the target NixOS systemd service; service variables take precedence. Build syncing only updates
+generated runtime files and asset directories, preserving uploads, databases, and backups.
+Deployment transfers a separate temporary database copy for local migration. Relative `DATA_DIR` paths resolve inside
 `/var/www/yangle`; use an absolute path to keep all data outside the deployment directory.
-The script builds before stopping the service, syncs the build, applies
-bundled Drizzle migrations using the target service environment, restarts systemd, and checks
-HTTP on port 3007. A failed sync or migration exits with an error and attempts to restart the
-service. Back up the production database before schema changes.
+The script builds before stopping the service, creates a consistent SQLite snapshot on the
+server, downloads it into a private temporary directory, and applies the checkout's Drizzle
+migrations locally. After integrity and foreign key checks, it uploads the migrated database,
+syncs the build, validates the uploaded database, and atomically replaces the production DB
+while preserving its ownership and permissions. It then restarts systemd and checks HTTP on
+port 3007. The service stays stopped throughout the database round trip to prevent lost writes.
+Production does not receive migration scripts or the `drizzle/` directory.
+
+Database paths use the target service's `DATA_DIR`, falling back to the runtime `.env` and
+then `storage/`. The original snapshot remains at
+`DATA_DIR/.deploy-<deployment-id>/original.db`; deployment prints its absolute path after
+installation. Local temporary copies are removed on success or failure. A failed download,
+migration or upload leaves the production database untouched and attempts to restart the
+service. If deployment fails during build sync or after database installation, inspect the
+service before retrying; code and database replacement are separate operations. Retained
+snapshots require manual cleanup when no longer needed. Restore a snapshot only with the
+service stopped and SQLite WAL state handled safely.
 
 ## NixOS notes
 
