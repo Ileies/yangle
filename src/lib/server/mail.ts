@@ -2,14 +2,15 @@ import nodemailer from 'nodemailer';
 import { env } from '$env/dynamic/private';
 
 const {
-	APP_URL,
+	ORIGIN,
 	SMTP_FROM = '',
 	SMTP_HOST = '',
 	SMTP_PASS = '',
 	SMTP_PORT = '587',
 	SMTP_USER = ''
 } = env;
-if (!APP_URL) throw new Error('APP_URL is not set');
+const appOrigin = ORIGIN || (process.env.NODE_ENV === 'development' ? 'http://localhost:5173' : '');
+if (!appOrigin) throw new Error('ORIGIN is not set');
 
 const transporter = SMTP_HOST
 	? nodemailer.createTransport({
@@ -21,7 +22,7 @@ const transporter = SMTP_HOST
 	: null;
 
 export async function sendMagicLinkEmail(email: string, token: string): Promise<void> {
-	const link = `${APP_URL}/login/verify?token=${token}`;
+	const link = `${appOrigin}/login/verify?token=${token}`;
 
 	if (!transporter) {
 		// No SMTP configured (local dev) - print the link instead of sending it.
@@ -47,7 +48,7 @@ export async function sendAlbumShareEmail(
 	albumName: string,
 	inviterName: string
 ): Promise<void> {
-	const link = `${APP_URL}/login`;
+	const link = `${appOrigin}/login`;
 
 	if (!transporter) {
 		console.log(`[mail] "${albumName}" shared with ${email} by ${inviterName}: ${link}`);

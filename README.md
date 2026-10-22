@@ -70,7 +70,7 @@ easiest way to develop locally.
 | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `DATABASE_URL`                                                      | Path to the SQLite file (e.g. `local.db`)                                                                                                                                                                                                                           |
 | `STORAGE_DIR`                                                       | Where uploaded originals/previews/thumbnails/ZIPs are written on disk                                                                                                                                                                                               |
-| `APP_URL`                                                           | Used to build absolute links in magic-link emails                                                                                                                                                                                                                   |
+| `ORIGIN`                                                            | Public app origin used to build absolute links in emails; defaults to `http://localhost:5173` in development                                                                                                                                                        |
 | `SMTP_HOST` / `SMTP_PORT` / `SMTP_USER` / `SMTP_PASS` / `SMTP_FROM` | SMTP creds for sending real magic-link emails. Leave blank in dev — see above. `SMTP_FROM`'s domain must have SPF/DKIM authorization on that SMTP account, or receiving providers will silently spam-filter or drop the mail even though your server "accepted" it. |
 
 ### Scripts
@@ -79,7 +79,7 @@ easiest way to develop locally.
 | --------------------- | ----------------------------------------------------------------------------- |
 | `bun run dev`         | Dev server (must be `bun --bun vite dev`, wired in already — see NixOS notes) |
 | `bun run build`       | Production build                                                              |
-| `bun run deploy`      | Build here, rsync artifacts, migrate and restart the systemd service            |
+| `bun run deploy`      | Build here, rsync artifacts, migrate and restart the systemd service          |
 | `bun run preview`     | Preview a production build                                                    |
 | `bun run check`       | `svelte-kit sync` + `svelte-check`                                            |
 | `bun run lint`        | `prettier --check` + `eslint`                                                 |
@@ -106,7 +106,7 @@ Run as root or grant passwordless sudo for `systemctl stop yangle.service` and
 
 Production `.env`, SQLite databases, uploads, and backups stay on the server; rsync only
 updates generated runtime files and asset/migration directories. `DATABASE_URL`, `STORAGE_DIR`,
-`APP_URL`, and SMTP settings are read at runtime from the target environment. Relative database
+`ORIGIN`, and SMTP settings are read at runtime from the target environment. Relative database
 and storage paths resolve inside `/var/www/yangle`. The script builds before stopping the
 service, syncs the build, applies bundled Drizzle migrations using the target `.env`, restarts
 systemd, and checks HTTP on port 3007. A failed sync or migration exits with an error and
