@@ -3,14 +3,15 @@ import exifr from 'exifr';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { rename, unlink } from 'node:fs/promises';
-import { STORAGE_DIR } from '$env/static/private';
+import { env } from '$env/dynamic/private';
 import { IMAGE_QUALITY, PREVIEW_MAX_PX, THUMBNAIL_MAX_PX } from '$lib/constants';
 import { Orientation } from '$lib/types';
 import { sha256Hex } from '$lib/utils';
 import type { BurstFingerprint } from '$lib/server/burstSimilarity';
 
 export function storagePath(...segments: string[]): string {
-	return path.join(STORAGE_DIR, ...segments);
+	if (!env.STORAGE_DIR) throw new Error('STORAGE_DIR is not set');
+	return path.join(env.STORAGE_DIR, ...segments);
 }
 
 // 8x8 difference hash. This is only the cheap first pass for burst candidates; SSIM and color

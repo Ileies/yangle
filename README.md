@@ -79,7 +79,7 @@ easiest way to develop locally.
 | --------------------- | ----------------------------------------------------------------------------- |
 | `bun run dev`         | Dev server (must be `bun --bun vite dev`, wired in already — see NixOS notes) |
 | `bun run build`       | Production build                                                              |
-| `bun run deploy`      | Pull, install, build, migrate and restart the app on `ros` via SSH            |
+| `bun run deploy`      | Build here, rsync artifacts, migrate and restart the systemd service            |
 | `bun run preview`     | Preview a production build                                                    |
 | `bun run check`       | `svelte-kit sync` + `svelte-check`                                            |
 | `bun run lint`        | `prettier --check` + `eslint`                                                 |
@@ -88,10 +88,29 @@ easiest way to develop locally.
 | `bun run db:migrate`  | Apply pending migrations                                                      |
 | `bun run db:studio`   | Drizzle Studio (browse/edit the SQLite DB)                                    |
 
-`bun run deploy` expects SSH access to `ros`, a checkout at `/var/www/yangle`, an existing
-systemd service named `yangle`, and passwordless sudo permission to restart it. Configure the
-server's `.env` (including persistent `DATABASE_URL` and `STORAGE_DIR` paths) before deploying.
-The deploy command stops if any step fails, before restarting the service.
+The source checkout on the server lives at `/projects/private/yangle`. Production runs from
+`/var/www/yangle/index.js`; the contents of `build/` are synced directly into that directory.
+The build includes dependencies and migrations, so the target needs Bun and rsync but no Git
+checkout, package installation, or PM2. Install source dependencies with
+`bun install --frozen-lockfile` before building.
+
+`bun run deploy` builds on the machine where it is invoked. On `pronix` it deploys directly;
+elsewhere it uses SSH host `ros`. Use `bun run deploy --local` to force direct deployment,
+`bun run deploy --host user@server` for another SSH destination, or add `--dry-run` to build
+and preview the file sync without stopping or modifying the deployed service.
+
+The target must have `yangle.service` configured to run `bun ./index.js` with working directory
+`/var/www/yangle`. Activate the updated NixOS configuration before the first deployment.
+Run as root or grant passwordless sudo for `systemctl stop yangle.service` and
+`systemctl restart yangle.service`. SSH deployments also need write access to the target.
+
+Production `.env`, SQLite databases, uploads, and backups stay on the server; rsync only
+updates generated runtime files and asset/migration directories. `DATABASE_URL`, `STORAGE_DIR`,
+`APP_URL`, and SMTP settings are read at runtime from the target environment. Relative database
+and storage paths resolve inside `/var/www/yangle`. The script builds before stopping the
+service, syncs the build, applies bundled Drizzle migrations using the target `.env`, restarts
+systemd, and checks HTTP on port 3007. A failed sync or migration exits with an error and
+attempts to restart the service. Back up the production database before schema changes.
 
 ## NixOS notes
 

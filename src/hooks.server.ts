@@ -1,10 +1,11 @@
 import type { Handle } from '@sveltejs/kit';
-import { STORAGE_DIR } from '$env/static/private';
+import { env } from '$env/dynamic/private';
 import { getSessionUser } from '$lib/server/auth';
 import { ensureStorageDirectories } from '$lib/server/storageDirectories';
 import { SESSION_COOKIE } from '$lib/constants';
 
-const storageDirectoriesReady = ensureStorageDirectories(STORAGE_DIR);
+if (!env.STORAGE_DIR) throw new Error('STORAGE_DIR is not set');
+const storageDirectoriesReady = ensureStorageDirectories(env.STORAGE_DIR);
 
 export const handle: Handle = async ({ event, resolve }) => {
 	await storageDirectoriesReady;

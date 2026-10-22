@@ -8,8 +8,8 @@
 	},
 	"scripts": {
 		"dev": "bun --bun vite dev",
-		"build": "bun --bun vite build",
-		"deploy": "ssh ros 'cd /var/www/yangle && git pull --ff-only && bun install --frozen-lockfile && bun run build && bun run db:migrate && sudo -n systemctl restart yangle'",
+		"build": "bun --bun vite build && bun build scripts/migrate.ts --target bun --outfile build/migrate.js && cp -R drizzle build/drizzle",
+		"deploy": "bash scripts/deploy.sh",
 		"preview": "vite preview",
 		"start": "bun build/index.js",
 		"prepare": "svelte-kit sync || echo ''",

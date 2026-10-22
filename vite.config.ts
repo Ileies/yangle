@@ -4,6 +4,8 @@ import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
+	// Ship a self-contained build/ so deployments need no package installation.
+	ssr: { noExternal: true },
 	plugins: [
 		tailwindcss(),
 		sveltekit({

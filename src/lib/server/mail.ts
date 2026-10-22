@@ -1,8 +1,15 @@
 import nodemailer from 'nodemailer';
-import { APP_URL } from '$env/static/private';
 import { env } from '$env/dynamic/private';
 
-const { SMTP_FROM = '', SMTP_HOST = '', SMTP_PASS = '', SMTP_PORT = '587', SMTP_USER = '' } = env;
+const {
+	APP_URL,
+	SMTP_FROM = '',
+	SMTP_HOST = '',
+	SMTP_PASS = '',
+	SMTP_PORT = '587',
+	SMTP_USER = ''
+} = env;
+if (!APP_URL) throw new Error('APP_URL is not set');
 
 const transporter = SMTP_HOST
 	? nodemailer.createTransport({
