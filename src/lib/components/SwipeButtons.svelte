@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Check, Heart, X } from '@lucide/svelte';
-	import { DecisionStatus } from '$lib/types';
+	import { DecisionStatus } from '#lib/types.js';
 
 	// Real <button> elements are the primary accessible path (TODO.md 3.8), not a gesture-only
 	// affordance - they dispatch through the exact same onDecide callback a swipe does. `angle`

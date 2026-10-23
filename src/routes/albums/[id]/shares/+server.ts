@@ -1,9 +1,9 @@
-import { error, json } from '@sveltejs/kit';
+import { error } from '@sveltejs/kit';
 import { z } from 'zod';
-import { addOrUpdateShare, removeShare, requireAlbumAccess } from '$lib/server/albums';
-import { parseJsonBody } from '$lib/server/jsonBody';
-import { sendAlbumShareEmail } from '$lib/server/mail';
-import { AlbumRole } from '$lib/types';
+import { addOrUpdateShare, removeShare, requireAlbumAccess } from '#lib/server/albums.js';
+import { parseJsonBody } from '#lib/server/jsonBody.js';
+import { sendAlbumShareEmail } from '#lib/server/mail.js';
+import { AlbumRole } from '#lib/types.js';
 import type { RequestHandler } from './$types';
 
 const shareSchema = z.object({
@@ -28,7 +28,7 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 	await addOrUpdateShare(albumId, email, role);
 	await sendAlbumShareEmail(email, album.name, locals.user.displayName).catch(() => {});
 
-	return json({ ok: true });
+	return Response.json({ ok: true });
 };
 
 export const DELETE: RequestHandler = async ({ params, request, locals }) => {
@@ -39,5 +39,5 @@ export const DELETE: RequestHandler = async ({ params, request, locals }) => {
 	const body = await parseJsonBody(request, z.object({ email: z.email() }), 'Invalid email');
 
 	await removeShare(albumId, body.email);
-	return json({ ok: true });
+	return Response.json({ ok: true });
 };

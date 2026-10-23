@@ -1,5 +1,5 @@
 import { describe, expect, test } from 'bun:test';
-import { Orientation } from '$lib/types';
+import { Orientation } from '#lib/types.js';
 import {
 	buildBurstClusters,
 	colorHistogramSimilarity,

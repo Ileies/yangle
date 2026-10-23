@@ -11,11 +11,11 @@
 		X
 	} from '@lucide/svelte';
 	import { SvelteMap } from 'svelte/reactivity';
-	import { formatBytes } from '$lib/utils';
-	import { photoUrl } from '$lib/photoUrls';
-	import { guardWeChatDownload } from '$lib/wechat';
-	import WeChatDownloadNotice from '$lib/components/WeChatDownloadNotice.svelte';
-	import { DecisionStatus, type Photo } from '$lib/types';
+	import { formatBytes } from '#lib/utils.js';
+	import { photoUrl } from '#lib/photoUrls.js';
+	import { guardWeChatDownload } from '#lib/wechat.js';
+	import WeChatDownloadNotice from '#lib/components/WeChatDownloadNotice.svelte';
+	import { DecisionStatus, type Photo } from '#lib/types.js';
 
 	let {
 		photos,
@@ -360,9 +360,7 @@
 						</button>
 					{/if}
 					<a
-						href={resolve(
-							`/photos/${photo.id}/original?v=${encodeURIComponent(photo.contentHash)}`
-						)}
+						href={resolve(`photos/${photo.id}/original?v=${encodeURIComponent(photo.contentHash)}`)}
 						download={photo.displayName}
 						class="btn btn-square btn-sm btn-outline"
 						title="Download"

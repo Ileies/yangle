@@ -1,8 +1,8 @@
-import { error, json } from '@sveltejs/kit';
+import { error } from '@sveltejs/kit';
 import { z } from 'zod';
-import { canContribute, getAlbumRole } from '$lib/server/albums';
-import { parseJsonBody } from '$lib/server/jsonBody';
-import { deletePhotos } from '$lib/server/photos';
+import { canContribute, getAlbumRole } from '#lib/server/albums.js';
+import { parseJsonBody } from '#lib/server/jsonBody.js';
+import { deletePhotos } from '#lib/server/photos.js';
 import type { RequestHandler } from './$types';
 
 const photoIdsSchema = z.array(z.number().int().positive());
@@ -23,5 +23,5 @@ export const DELETE: RequestHandler = async ({ params, request, locals }) => {
 	const body = await parseJsonBody(request, photoIdsSchema, 'Expected an array of photo IDs');
 
 	await deletePhotos(albumId, body);
-	return json({ ok: true });
+	return Response.json({ ok: true });
 };

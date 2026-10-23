@@ -3,8 +3,8 @@ import { decisions } from './db/schema';
 import { inArray } from 'drizzle-orm';
 import { listParticipants } from './albums';
 import { listResolvedUndecided } from './photos';
-import { DecisionStatus } from '$lib/types';
-import type { Photo } from '$lib/types';
+import { DecisionStatus } from '#lib/types.js';
+import type { Photo } from '#lib/types.js';
 
 export type ConflictEntry = {
 	photo: Photo;

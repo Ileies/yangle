@@ -1,5 +1,5 @@
-import { error, json } from '@sveltejs/kit';
-import { acceptInvite } from '$lib/server/albums';
+import { error } from '@sveltejs/kit';
+import { acceptInvite } from '#lib/server/albums.js';
 import type { RequestHandler } from './$types';
 
 export const POST: RequestHandler = async ({ params, locals }) => {
@@ -8,5 +8,5 @@ export const POST: RequestHandler = async ({ params, locals }) => {
 	const album = await acceptInvite(params.token, locals.user.email);
 	if (!album) error(404, 'This invite link is invalid or has been revoked');
 
-	return json({ albumId: album.id });
+	return Response.json({ albumId: album.id });
 };

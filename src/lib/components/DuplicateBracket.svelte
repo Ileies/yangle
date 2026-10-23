@@ -2,10 +2,10 @@
 	import { onMount } from 'svelte';
 	import { Check } from '@lucide/svelte';
 	import { SvelteMap } from 'svelte/reactivity';
-	import type { DeckPhoto } from '$lib/types';
-	import { clamp } from '$lib/utils';
-	import { pairDuplicatesBySimilarity } from '$lib/duplicatePairing';
-	import { photoUrl } from '$lib/photoUrls';
+	import type { DeckPhoto } from '#lib/types.js';
+	import { clamp } from '#lib/utils.js';
+	import { pairDuplicatesBySimilarity } from '#lib/duplicatePairing.js';
+	import { photoUrl } from '#lib/photoUrls.js';
 
 	// Single-elimination bracket over a burst-shot cluster (TODO.md 3.4). The bracket's state
 	// (round, pairing, byes) is entirely computed client-side from the still-unresolved cluster

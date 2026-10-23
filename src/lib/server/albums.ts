@@ -2,9 +2,9 @@ import { db } from './db';
 import { albums, albumShares, photos, users } from './db/schema';
 import { and, eq, inArray } from 'drizzle-orm';
 import { error } from '@sveltejs/kit';
-import { randomToken } from '$lib/utils';
-import { AlbumRole, DecisionMode, ResolveMode } from '$lib/types';
-import type { Album, AlbumShare, AlbumWithCover } from '$lib/types';
+import { randomToken } from '#lib/utils.js';
+import { AlbumRole, DecisionMode, ResolveMode } from '#lib/types.js';
+import type { Album, AlbumShare, AlbumWithCover } from '#lib/types.js';
 
 const COVER_PHOTOS_PER_ALBUM = 3;
 

@@ -1,7 +1,7 @@
 import { error } from '@sveltejs/kit';
-import { getAlbumRole } from '$lib/server/albums';
-import { getPhoto } from '$lib/server/photos';
-import { storagePath } from '$lib/server/storage';
+import { getAlbumRole } from '#lib/server/albums.js';
+import { getPhoto } from '#lib/server/photos.js';
+import { storagePath } from '#lib/server/storage.js';
 import type { RequestHandler } from './$types';
 
 // Auth-gated file serving: images live outside `static/` on purpose, so access follows

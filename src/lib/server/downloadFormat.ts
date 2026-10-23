@@ -1,4 +1,4 @@
-import type { Photo } from '$lib/types';
+import type { Photo } from '#lib/types.js';
 
 export type DownloadFormat = 'original' | 'compatible';
 

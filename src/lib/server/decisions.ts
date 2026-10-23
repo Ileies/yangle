@@ -1,7 +1,7 @@
 import { db } from './db';
 import { decisions } from './db/schema';
 import { and, eq, inArray, sql } from 'drizzle-orm';
-import { DecisionStatus } from '$lib/types';
+import { DecisionStatus } from '#lib/types.js';
 
 export type DecisionInput = { photoId: number; status: DecisionStatus };
 

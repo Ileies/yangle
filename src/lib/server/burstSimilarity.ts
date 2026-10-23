@@ -1,5 +1,5 @@
-import { hammingDistance } from '$lib/utils';
-import type { Orientation } from '$lib/types';
+import { hammingDistance } from '#lib/utils.js';
+import type { Orientation } from '#lib/types.js';
 
 export const BURST_CAPTURE_WINDOW_MS = 30_000;
 export const BURST_DHASH_THRESHOLD = 6;

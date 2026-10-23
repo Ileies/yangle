@@ -33,8 +33,8 @@ Bun.Image successfully; the targeted checks above remain pending.
 
 ## 0. Foundation / scaffold
 
-- [x] SvelteKit 2 + Svelte 5 (runes) + Bun, Tailwind 4 + DaisyUI 5, Drizzle/SQLite,
-      `@sveltejs/adapter-node`, Nix dev shell, type-check/lint/format all clean
+- [x] SvelteKit 3 + Svelte 5 (runes) + Bun, Tailwind 4 + DaisyUI 5, Drizzle/SQLite,
+      `@sveltejs/adapter-bun`, Nix dev shell, type-check/lint/format all clean
 - [x] PWA manifest (`static/manifest.webmanifest` + icons + `<link rel="manifest">` in
       `app.html`) — cheap to add and buys the "installed app" feel (home-screen icon, no
       browser chrome) that matters a lot for a swipe-heavy full-screen mobile UI. Not full

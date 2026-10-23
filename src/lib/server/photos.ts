@@ -2,9 +2,9 @@ import { db } from './db';
 import { photoNameVariants, photos } from './db/schema';
 import { and, eq, inArray } from 'drizzle-orm';
 import type { StoredImage } from './storage';
-import type { Photo } from '$lib/types';
+import type { Photo } from '#lib/types.js';
 import { buildBurstClusters, type BurstCandidate } from './burstSimilarity';
-import { compareImageNames } from '$lib/imageNames';
+import { compareImageNames } from '#lib/imageNames.js';
 
 // Of these content hashes, which ones already exist in the album - keyed by hash so the
 // upload flow can skip re-sending bytes it already has and instead surface a name conflict.

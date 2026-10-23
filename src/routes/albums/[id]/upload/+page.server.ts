@@ -1,8 +1,8 @@
 import { error, redirect } from '@sveltejs/kit';
-import { db } from '$lib/server/db';
-import { albums } from '$lib/server/db/schema';
+import { db } from '#lib/server/db/index.js';
+import { albums } from '#lib/server/db/schema.js';
 import { eq } from 'drizzle-orm';
-import { canContribute, getAlbumRole } from '$lib/server/albums';
+import { canContribute, getAlbumRole } from '#lib/server/albums.js';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ params, locals }) => {

@@ -34,11 +34,11 @@ SQLite app that keeps uploaded photos on local disk.
 
 ## Tech stack
 
-- **SvelteKit 2** + **Svelte 5** (runes) on **Bun**
+- **SvelteKit 3** + **Svelte 5** (runes) on **Bun**
 - **Tailwind CSS 4** + **DaisyUI 5**
 - **Drizzle ORM** over **SQLite** (`bun:sqlite` at runtime — no native `better-sqlite3` build
   needed; see [NixOS notes](#nixos-notes))
-- **`@sveltejs/adapter-node`** — self-hosted, matches the "storage is local disk" design
+- **`@sveltejs/adapter-bun`** — self-hosted on Bun, matching the "storage is local disk" design
 - **`Bun.Image`** for thumbnails, previews and JPEG compatibility renditions on supported hosts;
   **`pngjs`** reads the small generated PNGs used for duplicate fingerprints (pure JavaScript).
   **`fflate`** handles streamed ZIP downloads.
@@ -48,7 +48,7 @@ SQLite app that keeps uploaded photos on local disk.
 
 ### Prerequisites
 
-- [Bun >= 1.3.14](https://bun.com/blog/bun-v1.3.14), including in production (`bun run start`).
+- [Bun >= 1.4.0](https://bun.com/docs/installation), including in production (`bun run start`).
 - A SQLite-capable environment; see [NixOS notes](#nixos-notes) below.
 
 ### Setup
@@ -102,8 +102,9 @@ stored photo paths are relative to it. Run `bun run db:migrate` after configurin
 
 The source checkout on the server lives at `/projects/private/yangle`. Production runs from
 `/var/www/yangle/index.js`; the contents of `build/` are synced directly into that directory.
-The build includes dependencies, so the target needs Bun and rsync but no Git
-checkout, package installation, or PM2. Install source dependencies with
+The adapter build leaves production dependencies external, so deployment also syncs `package.json`
+and `bun.lock` and runs `bun install --production --frozen-lockfile` on the target. The target
+needs Bun and rsync, but no Git checkout or PM2. Install source dependencies with
 `bun install --frozen-lockfile` before building.
 
 `bun run deploy` builds on the machine where it is invoked. On `pronix` it deploys directly;
@@ -111,14 +112,15 @@ elsewhere it uses SSH host `ros`. Use `bun run deploy --local` to force direct d
 `bun run deploy --host user@server` for another SSH destination, or add `--dry-run` to build
 and preview the file sync without stopping or modifying the deployed service.
 
-The target must have `yangle.service` configured to run `bun ./index.js` with working directory
-`/var/www/yangle`. Activate the updated NixOS configuration before the first deployment.
+The target must have Bun 1.4 or newer and `yangle.service` configured to run `bun ./index.js` with
+working directory `/var/www/yangle`. Activate the updated NixOS configuration before the first deployment.
 Run as root or grant passwordless sudo for `systemctl stop yangle.service` and
 `systemctl restart yangle.service`. SSH deployments also need write access to the target.
 
 Production environment variables can be configured in `.env` in the runtime directory or in
-the target NixOS systemd service; service variables take precedence. Build syncing only updates
-generated runtime files and asset directories, preserving uploads, databases, and backups.
+the target NixOS systemd service; service variables take precedence. Deployment updates generated
+runtime files, dependency manifests, and production dependencies, preserving uploads, databases,
+and backups.
 Deployment transfers a separate temporary database copy for local migration. Relative `DATA_DIR` paths resolve inside
 `/var/www/yangle`; use an absolute path to keep all data outside the deployment directory.
 The script builds before stopping the service, creates a consistent SQLite snapshot on the
@@ -142,7 +144,7 @@ service stopped and SQLite WAL state handled safely.
 ## NixOS notes
 
 Image processing uses Bun's built-in codecs, without a native npm image addon or a custom
-`LD_LIBRARY_PATH`. The flake provides Bun; update its nixpkgs input once Bun >= 1.3.14 is
+`LD_LIBRARY_PATH`. The flake provides Bun; update its nixpkgs input once Bun >= 1.4.0 is
 available there. No system or flake-input update is performed as part of the migration.
 
 [`Bun.Image`](https://bun.com/docs/runtime/image) supports JPEG, PNG and WebP on Linux.

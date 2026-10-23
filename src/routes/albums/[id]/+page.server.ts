@@ -1,7 +1,7 @@
 import { redirect } from '@sveltejs/kit';
-import { canContribute, requireAlbumAccess } from '$lib/server/albums';
-import { getDecisionsFor } from '$lib/server/decisions';
-import { listPhotos } from '$lib/server/photos';
+import { canContribute, requireAlbumAccess } from '#lib/server/albums.js';
+import { getDecisionsFor } from '#lib/server/decisions.js';
+import { listPhotos } from '#lib/server/photos.js';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ params, locals }) => {

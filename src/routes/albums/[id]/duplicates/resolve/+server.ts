@@ -1,8 +1,8 @@
-import { error, json } from '@sveltejs/kit';
+import { error } from '@sveltejs/kit';
 import { z } from 'zod';
-import { requireAlbumAccess } from '$lib/server/albums';
-import { parseJsonBody } from '$lib/server/jsonBody';
-import { getPhotoInAlbum, resolveDuplicateSurvivor } from '$lib/server/photos';
+import { requireAlbumAccess } from '#lib/server/albums.js';
+import { parseJsonBody } from '#lib/server/jsonBody.js';
+import { getPhotoInAlbum, resolveDuplicateSurvivor } from '#lib/server/photos.js';
 import type { RequestHandler } from './$types';
 
 const resolveSchema = z.object({ photoId: z.number().int().positive() });
@@ -22,5 +22,5 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 	if (!photo) error(404, 'Photo not found');
 
 	await resolveDuplicateSurvivor(photoId);
-	return json({ ok: true });
+	return Response.json({ ok: true });
 };

@@ -1,11 +1,11 @@
 import { Database } from 'bun:sqlite';
 import { drizzle } from 'drizzle-orm/bun-sqlite';
 import * as schema from './schema';
-import { env } from '$env/dynamic/private';
+import { DATA_DIR } from '$app/env/private';
 import { mkdirSync } from 'node:fs';
-import { getStoragePaths } from '$lib/server/storageConfig';
+import { getStoragePaths } from '#lib/server/storageConfig.js';
 
-const storage = getStoragePaths(env.DATA_DIR);
+const storage = getStoragePaths(DATA_DIR);
 mkdirSync(storage.directory, { recursive: true });
 
 // bun:sqlite doesn't enforce FKs by default - without this, every `onDelete: cascade` in

@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { invalidateAll } from '$app/navigation';
+	import { refreshAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import {
 		ArrowUp,
@@ -14,9 +14,9 @@
 		Upload,
 		X
 	} from '@lucide/svelte';
-	import PhotoViewer from '$lib/components/PhotoViewer.svelte';
-	import { photoUrl } from '$lib/photoUrls';
-	import { AlbumRole, DecisionMode, DecisionStatus, type Photo } from '$lib/types';
+	import PhotoViewer from '#lib/components/PhotoViewer.svelte';
+	import { photoUrl } from '#lib/photoUrls.js';
+	import { AlbumRole, DecisionMode, DecisionStatus, type Photo } from '#lib/types.js';
 	import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 	import type { PageData } from './$types';
 
@@ -125,7 +125,7 @@
 				body: JSON.stringify(photoIds)
 			});
 			if (!res.ok) throw new Error();
-			await invalidateAll();
+			await refreshAll();
 		} catch {
 			errorMessage = `Couldn't delete ${count} photo${count === 1 ? '' : 's'}.`;
 		}
@@ -141,7 +141,7 @@
 			});
 			if (!res.ok) throw new Error();
 			openIndex = null;
-			await invalidateAll();
+			await refreshAll();
 		} catch {
 			errorMessage = `Couldn't delete "${photo.displayName}".`;
 		}

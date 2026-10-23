@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
-	import type { AlbumWithCover } from '$lib/types';
-	import { photoStackPlacements } from '$lib/utils';
-	import { photoUrl } from '$lib/photoUrls';
+	import type { AlbumWithCover } from '#lib/types.js';
+	import { photoStackPlacements } from '#lib/utils.js';
+	import { photoUrl } from '#lib/photoUrls.js';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();

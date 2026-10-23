@@ -33,7 +33,7 @@
 	</form>
 
 	<a
-		href={resolve('/albums')}
+		href={resolve('albums')}
 		class="link link-hover flex items-center gap-1 self-start text-sm text-base-content/60"
 	>
 		<ArrowLeft class="size-4" /> Back

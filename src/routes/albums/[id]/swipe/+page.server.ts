@@ -1,8 +1,8 @@
 import { redirect } from '@sveltejs/kit';
-import { canContribute, requireAlbumAccess } from '$lib/server/albums';
-import { getDecisionsFor } from '$lib/server/decisions';
-import { listPendingDuplicateClusters, listResolvedUndecided } from '$lib/server/photos';
-import { DecisionStatus, type DeckPhoto } from '$lib/types';
+import { canContribute, requireAlbumAccess } from '#lib/server/albums.js';
+import { getDecisionsFor } from '#lib/server/decisions.js';
+import { listPendingDuplicateClusters, listResolvedUndecided } from '#lib/server/photos.js';
+import { DecisionStatus, type DeckPhoto } from '#lib/types.js';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ params, locals }) => {

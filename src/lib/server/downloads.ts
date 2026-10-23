@@ -3,8 +3,8 @@ import { downloadBatches, downloadBatchPhotos, photoDownloads } from './db/schem
 import { and, eq, inArray } from 'drizzle-orm';
 import { getDecisionsFor } from './decisions';
 import { listPhotos } from './photos';
-import { DecisionStatus, DownloadBatchStatus } from '$lib/types';
-import type { Photo } from '$lib/types';
+import { DecisionStatus, DownloadBatchStatus } from '#lib/types.js';
+import type { Photo } from '#lib/types.js';
 
 export type DownloadBadge = 'downloaded' | 'new' | 'undecided';
 

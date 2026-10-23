@@ -3,15 +3,15 @@ import exifr from 'exifr';
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { rename, unlink } from 'node:fs/promises';
-import { env } from '$env/dynamic/private';
-import { IMAGE_QUALITY, PREVIEW_MAX_PX, THUMBNAIL_MAX_PX } from '$lib/constants';
-import { Orientation } from '$lib/types';
-import { sha256Hex } from '$lib/utils';
-import type { BurstFingerprint } from '$lib/server/burstSimilarity';
-import { getStoragePaths } from '$lib/server/storageConfig';
+import { DATA_DIR } from '$app/env/private';
+import { IMAGE_QUALITY, PREVIEW_MAX_PX, THUMBNAIL_MAX_PX } from '#lib/constants.js';
+import { Orientation } from '#lib/types.js';
+import { sha256Hex } from '#lib/utils.js';
+import type { BurstFingerprint } from '#lib/server/burstSimilarity.js';
+import { getStoragePaths } from '#lib/server/storageConfig.js';
 
 export function storagePath(...segments: string[]): string {
-	return path.join(getStoragePaths(env.DATA_DIR).directory, ...segments);
+	return path.join(getStoragePaths(DATA_DIR).directory, ...segments);
 }
 
 // 8x8 difference hash. This is only the cheap first pass for burst candidates; SSIM and color
@@ -96,7 +96,7 @@ async function writeAtomic(
 }
 
 export async function storeUpload(buffer: Buffer, extensionHint: string): Promise<StoredImage> {
-	if (typeof Bun.Image !== 'function') throw new Error('Image processing requires Bun >= 1.3.14.');
+	if (typeof Bun.Image !== 'function') throw new Error('Image processing requires Bun >= 1.4.0.');
 	const metadata = await new Bun.Image(buffer, { autoOrient: false }).metadata();
 	if (process.platform === 'linux' && HEIF_FORMATS.has(metadata.format)) {
 		throw new Error(

@@ -1,9 +1,9 @@
-import { error, json } from '@sveltejs/kit';
+import { error } from '@sveltejs/kit';
 import { z } from 'zod';
-import { canContribute, getAlbumRole } from '$lib/server/albums';
-import { flattenImageName, uniqueImageName } from '$lib/imageNames';
-import { parseJsonBody } from '$lib/server/jsonBody';
-import { getPhoto, listPhotoNames, recordNameVariant, setDisplayName } from '$lib/server/photos';
+import { canContribute, getAlbumRole } from '#lib/server/albums.js';
+import { flattenImageName, uniqueImageName } from '#lib/imageNames.js';
+import { parseJsonBody } from '#lib/server/jsonBody.js';
+import { getPhoto, listPhotoNames, recordNameVariant, setDisplayName } from '#lib/server/photos.js';
 import type { RequestHandler } from './$types';
 
 const resolveSchema = z.object({
@@ -41,5 +41,5 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 		await setDisplayName(photoId, uniqueImageName(flattenedKeepName, usedNames));
 	}
 
-	return json({ ok: true });
+	return Response.json({ ok: true });
 };

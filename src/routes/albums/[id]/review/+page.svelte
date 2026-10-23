@@ -1,11 +1,11 @@
 <script lang="ts">
 	import { ArrowLeft, RotateCcw } from '@lucide/svelte';
-	import { invalidateAll } from '$app/navigation';
+	import { refreshAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { SvelteMap } from 'svelte/reactivity';
-	import PhotoViewer from '$lib/components/PhotoViewer.svelte';
-	import { photoUrl } from '$lib/photoUrls';
-	import { DecisionStatus, type Photo } from '$lib/types';
+	import PhotoViewer from '#lib/components/PhotoViewer.svelte';
+	import { photoUrl } from '#lib/photoUrls.js';
+	import { DecisionStatus, type Photo } from '#lib/types.js';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -101,7 +101,7 @@
 			});
 			if (!res.ok) throw new Error();
 			openIndex = null;
-			await invalidateAll();
+			await refreshAll();
 		} catch {
 			errorMessage = `Couldn't delete "${photo.displayName}".`;
 		}

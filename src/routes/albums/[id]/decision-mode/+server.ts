@@ -1,8 +1,8 @@
-import { error, json } from '@sveltejs/kit';
+import { error } from '@sveltejs/kit';
 import { z } from 'zod';
-import { requireAlbumAccess, updateDecisionSettings } from '$lib/server/albums';
-import { parseJsonBody } from '$lib/server/jsonBody';
-import { AlbumRole, DecisionMode, ResolveMode } from '$lib/types';
+import { requireAlbumAccess, updateDecisionSettings } from '#lib/server/albums.js';
+import { parseJsonBody } from '#lib/server/jsonBody.js';
+import { AlbumRole, DecisionMode, ResolveMode } from '#lib/types.js';
 import type { RequestHandler } from './$types';
 
 const settingsSchema = z.object({
@@ -19,5 +19,5 @@ export const PATCH: RequestHandler = async ({ params, request, locals }) => {
 	const body = await parseJsonBody(request, settingsSchema, 'Invalid decision settings');
 
 	await updateDecisionSettings(albumId, body.decisionMode, body.resolveMode);
-	return json({ ok: true });
+	return Response.json({ ok: true });
 };

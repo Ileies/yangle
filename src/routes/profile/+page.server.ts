@@ -1,6 +1,6 @@
 import { fail, redirect } from '@sveltejs/kit';
-import { destroyAllSessions, updateDisplayName } from '$lib/server/auth';
-import { SESSION_COOKIE } from '$lib/constants';
+import { destroyAllSessions, updateDisplayName } from '#lib/server/auth.js';
+import { SESSION_COOKIE } from '#lib/constants.js';
 import type { Actions, PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals }) => {

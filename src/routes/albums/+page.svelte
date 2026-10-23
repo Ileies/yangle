@@ -1,9 +1,9 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { FolderPlus } from '@lucide/svelte';
-	import type { AlbumWithCover } from '$lib/types';
-	import { photoStackPlacements } from '$lib/utils';
-	import { photoUrl } from '$lib/photoUrls';
+	import type { AlbumWithCover } from '#lib/types.js';
+	import { photoStackPlacements } from '#lib/utils.js';
+	import { photoUrl } from '#lib/photoUrls.js';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -22,9 +22,9 @@
 						stroke-width="1.5"
 						class="h-8 w-8"
 					>
-						<rect x="3" y="3" width="18" height="18" rx="2" />
-						<circle cx="8.5" cy="8.5" r="1.5" />
-						<path d="M21 15l-5-5L5 21" />
+						<rect x="3" y="3" width="18" height="18" rx="2"></rect>
+						<circle cx="8.5" cy="8.5" r="1.5"></circle>
+						<path d="M21 15l-5-5L5 21"></path>
 					</svg>
 				</div>
 			{:else}
@@ -61,8 +61,10 @@
 <div class="mx-auto flex min-h-full max-w-md flex-col gap-8 p-6">
 	<div class="flex items-center justify-between">
 		<h1 class="text-2xl font-semibold">Albums</h1>
-		<a href={resolve('/albums/new')} class="btn btn-primary btn-sm">
-			<FolderPlus class="size-4" /> <span class="hidden sm:inline">New album</span>
+
+		<a href={resolve('albums/new')} class="btn btn-primary btn-sm">
+			<FolderPlus class="size-4" />
+			<span class="hidden sm:inline">New album</span>
 		</a>
 	</div>
 

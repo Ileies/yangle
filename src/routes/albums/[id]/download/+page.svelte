@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { ArrowLeft, Download } from '@lucide/svelte';
-	import { DecisionStatus } from '$lib/types';
-	import { photoUrl } from '$lib/photoUrls';
-	import { guardWeChatDownload } from '$lib/wechat';
-	import WeChatDownloadNotice from '$lib/components/WeChatDownloadNotice.svelte';
+	import { DecisionStatus } from '#lib/types.js';
+	import { photoUrl } from '#lib/photoUrls.js';
+	import { guardWeChatDownload } from '#lib/wechat.js';
+	import WeChatDownloadNotice from '#lib/components/WeChatDownloadNotice.svelte';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();

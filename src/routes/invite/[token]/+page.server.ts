@@ -1,5 +1,5 @@
 import { error, redirect } from '@sveltejs/kit';
-import { getAlbumByInviteToken, getAlbumRole } from '$lib/server/albums';
+import { getAlbumByInviteToken, getAlbumRole } from '#lib/server/albums.js';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ params, locals }) => {

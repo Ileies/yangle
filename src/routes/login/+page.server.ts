@@ -1,7 +1,7 @@
 import { fail, redirect } from '@sveltejs/kit';
 import { z } from 'zod';
-import { createMagicLink } from '$lib/server/auth';
-import { sendMagicLinkEmail } from '$lib/server/mail';
+import { createMagicLink } from '#lib/server/auth.js';
+import { sendMagicLinkEmail } from '#lib/server/mail.js';
 import type { Actions, PageServerLoad } from './$types';
 
 const ERROR_MESSAGES: Record<string, string> = {

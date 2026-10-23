@@ -1,10 +1,10 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
-	import { goto, invalidateAll } from '$app/navigation';
+	import { goto, refreshAll } from '$app/navigation';
 	import { resolve } from '$app/paths';
 	import { page } from '$app/state';
 	import { ArrowLeft, Copy, Link2, Trash2, UserMinus, UserPlus } from '@lucide/svelte';
-	import { AlbumRole, DecisionMode, ResolveMode } from '$lib/types';
+	import { AlbumRole, DecisionMode, ResolveMode } from '#lib/types.js';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();
@@ -38,7 +38,7 @@
 			});
 			if (!res.ok) throw new Error(await res.text());
 			inviteEmail = '';
-			await invalidateAll();
+			await refreshAll();
 		} catch {
 			errorMessage = "Couldn't share the album with that address.";
 		} finally {
@@ -55,7 +55,7 @@
 				body: JSON.stringify({ email })
 			});
 			if (!res.ok) throw new Error();
-			await invalidateAll();
+			await refreshAll();
 		} catch {
 			errorMessage = "Couldn't remove that person.";
 		} finally {
@@ -72,7 +72,7 @@
 				body: JSON.stringify({ role: linkRole })
 			});
 			if (!res.ok) throw new Error();
-			await invalidateAll();
+			await refreshAll();
 		} catch {
 			errorMessage = "Couldn't create a link.";
 		} finally {
@@ -85,7 +85,7 @@
 		try {
 			const res = await fetch(`/albums/${data.album.id}/invite-link`, { method: 'DELETE' });
 			if (!res.ok) throw new Error();
-			await invalidateAll();
+			await refreshAll();
 		} catch {
 			errorMessage = "Couldn't revoke the link.";
 		} finally {
@@ -109,7 +109,7 @@
 				})
 			});
 			if (!res.ok) throw new Error();
-			await invalidateAll();
+			await refreshAll();
 		} catch {
 			errorMessage = "Couldn't save decision settings.";
 		} finally {
@@ -123,7 +123,7 @@
 		try {
 			const res = await fetch(`/albums/${data.album.id}/delete`, { method: 'DELETE' });
 			if (!res.ok) throw new Error();
-			await goto(resolve('/albums'));
+			await goto(resolve('albums'));
 		} catch {
 			errorMessage = "Couldn't delete the album.";
 			busy = false;
@@ -143,7 +143,7 @@
 		<ArrowLeft class="size-4" /> Back to album
 	</a>
 
-	<h1 class="truncate text-2xl font-semibold">{data.album.name} &middot; Settings</h1>
+	<h1 class="truncate text-2xl font-semibold">{data.album.name} · Settings</h1>
 
 	<section class="flex flex-col gap-3">
 		<h2 class="font-medium">Shared with</h2>
@@ -291,9 +291,9 @@
 
 	{#if errorMessage}
 		<div class="toast toast-center toast-bottom z-50">
-			<button type="button" class="alert alert-error text-sm" onclick={() => (errorMessage = null)}>
-				{errorMessage}
-			</button>
+			<button type="button" class="alert alert-error text-sm" onclick={() => (errorMessage = null)}
+				>{errorMessage}</button
+			>
 		</div>
 	{/if}
 </div>

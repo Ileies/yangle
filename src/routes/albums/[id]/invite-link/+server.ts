@@ -1,8 +1,8 @@
-import { error, json } from '@sveltejs/kit';
+import { error } from '@sveltejs/kit';
 import { z } from 'zod';
-import { getAlbumRole, revokeInviteLink, setInviteLink } from '$lib/server/albums';
-import { parseJsonBody } from '$lib/server/jsonBody';
-import { AlbumRole } from '$lib/types';
+import { getAlbumRole, revokeInviteLink, setInviteLink } from '#lib/server/albums.js';
+import { parseJsonBody } from '#lib/server/jsonBody.js';
+import { AlbumRole } from '#lib/types.js';
 import type { RequestHandler } from './$types';
 
 async function requireOwner(albumId: number, email: string) {
@@ -22,7 +22,7 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 	);
 
 	const token = await setInviteLink(albumId, body.role);
-	return json({ token });
+	return Response.json({ token });
 };
 
 export const DELETE: RequestHandler = async ({ params, locals }) => {
@@ -31,5 +31,5 @@ export const DELETE: RequestHandler = async ({ params, locals }) => {
 	await requireOwner(albumId, locals.user.email);
 
 	await revokeInviteLink(albumId);
-	return json({ ok: true });
+	return Response.json({ ok: true });
 };

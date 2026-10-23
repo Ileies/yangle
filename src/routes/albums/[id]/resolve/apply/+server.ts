@@ -1,10 +1,10 @@
-import { error, json } from '@sveltejs/kit';
+import { error } from '@sveltejs/kit';
 import { z } from 'zod';
-import { listParticipants, requireAlbumAccess } from '$lib/server/albums';
-import { applyDecisionToAll } from '$lib/server/decisions';
-import { parseJsonBody } from '$lib/server/jsonBody';
-import { getPhotoInAlbum } from '$lib/server/photos';
-import { DecisionMode, DecisionStatus } from '$lib/types';
+import { listParticipants, requireAlbumAccess } from '#lib/server/albums.js';
+import { applyDecisionToAll } from '#lib/server/decisions.js';
+import { parseJsonBody } from '#lib/server/jsonBody.js';
+import { getPhotoInAlbum } from '#lib/server/photos.js';
+import { DecisionMode, DecisionStatus } from '#lib/types.js';
 import type { RequestHandler } from './$types';
 
 const bodySchema = z.object({
@@ -32,5 +32,5 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 	const participants = await listParticipants(albumId);
 	await applyDecisionToAll(participants, body.photoId, body.status);
 
-	return json({ ok: true });
+	return Response.json({ ok: true });
 };

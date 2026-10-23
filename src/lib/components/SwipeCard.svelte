@@ -6,9 +6,9 @@
 		SWIPE_DISMISS_VELOCITY,
 		ZOOM_MAX_SCALE,
 		ZOOM_MIN_SCALE
-	} from '$lib/constants';
-	import { DecisionStatus } from '$lib/types';
-	import { clamp } from '$lib/utils';
+	} from '#lib/constants.js';
+	import { DecisionStatus } from '#lib/types.js';
+	import { clamp } from '#lib/utils.js';
 
 	// See TODO.md 3.1.1/3.1.2 for the full gesture state machine and zoom/pan reasoning this
 	// implements. `active` marks the top-of-deck card - only it receives gesture bindings;

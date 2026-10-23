@@ -1,14 +1,13 @@
-import adapter from '@sveltejs/adapter-node';
+import adapter from '@sveltejs/adapter-bun';
 import tailwindcss from '@tailwindcss/vite';
 import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-	// Ship a self-contained build/ so deployments need no package installation.
-	ssr: { noExternal: true },
 	plugins: [
 		tailwindcss(),
 		sveltekit({
+			...(process.env.ORIGIN ? { paths: { origin: process.env.ORIGIN } } : {}),
 			compilerOptions: {
 				// Force runes mode for the project, except for libraries. Can be removed in svelte 6.
 				runes: ({ filename }) =>

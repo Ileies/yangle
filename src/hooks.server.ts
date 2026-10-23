@@ -1,11 +1,11 @@
-import type { Handle } from '@sveltejs/kit';
-import { env } from '$env/dynamic/private';
-import { getSessionUser } from '$lib/server/auth';
-import { ensureStorageDirectories } from '$lib/server/storageDirectories';
-import { SESSION_COOKIE } from '$lib/constants';
-import { getStoragePaths } from '$lib/server/storageConfig';
+import type { Handle } from '@sveltejs/kit/hooks';
+import { DATA_DIR } from '$app/env/private';
+import { getSessionUser } from '#lib/server/auth.js';
+import { ensureStorageDirectories } from '#lib/server/storageDirectories.js';
+import { SESSION_COOKIE } from '#lib/constants.js';
+import { getStoragePaths } from '#lib/server/storageConfig.js';
 
-const storageDirectoriesReady = ensureStorageDirectories(getStoragePaths(env.DATA_DIR).directory);
+const storageDirectoriesReady = ensureStorageDirectories(getStoragePaths(DATA_DIR).directory);
 
 export const handle: Handle = async ({ event, resolve }) => {
 	await storageDirectoriesReady;

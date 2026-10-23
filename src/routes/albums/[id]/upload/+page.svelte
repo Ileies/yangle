@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { resolve } from '$app/paths';
 	import { ArrowLeft, Check, ChevronDown, FolderUp, X } from '@lucide/svelte';
-	import { sha256Hex } from '$lib/utils';
-	import { flattenImageName } from '$lib/imageNames';
+	import { sha256Hex } from '#lib/utils.js';
+	import { flattenImageName } from '#lib/imageNames.js';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();

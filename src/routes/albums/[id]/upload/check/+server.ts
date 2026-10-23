@@ -1,8 +1,8 @@
-import { error, json } from '@sveltejs/kit';
+import { error } from '@sveltejs/kit';
 import { z } from 'zod';
-import { getAlbumRole, canContribute } from '$lib/server/albums';
-import { parseJsonBody } from '$lib/server/jsonBody';
-import { findExistingByHash } from '$lib/server/photos';
+import { getAlbumRole, canContribute } from '#lib/server/albums.js';
+import { parseJsonBody } from '#lib/server/jsonBody.js';
+import { findExistingByHash } from '#lib/server/photos.js';
 import type { RequestHandler } from './$types';
 
 const checkSchema = z.object({ hashes: z.array(z.string().regex(/^[a-f0-9]{64}$/)) });
@@ -19,7 +19,7 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 	const { hashes } = await parseJsonBody(request, checkSchema, 'Invalid hashes');
 	const existing = await findExistingByHash(albumId, hashes);
 
-	return json({
+	return Response.json({
 		existing: Array.from(existing.values()).map((photo) => ({
 			hash: photo.contentHash,
 			id: photo.id,

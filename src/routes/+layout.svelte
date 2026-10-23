@@ -3,18 +3,19 @@
 	import { page } from '$app/state';
 	import { resolve } from '$app/paths';
 	import { Images, CircleUser, Layers } from '@lucide/svelte';
-	import { yangle } from '$lib/state.svelte';
+	import { yangle } from '#lib/state.svelte.js';
 	import type { LayoutData } from './$types';
 
 	let { data, children }: { data: LayoutData; children: import('svelte').Snippet } = $props();
+	let albumsHref = $derived(resolve('albums'));
+	let profileHref = $derived(resolve('profile'));
 
-	let albumsHref = $derived(resolve('/albums'));
-	let profileHref = $derived(resolve('/profile'));
 	let swipeHref = $derived(
 		yangle.activeSwipeAlbumId !== null
 			? resolve('/albums/[id]/swipe', { id: String(yangle.activeSwipeAlbumId) })
-			: resolve('/swipe')
+			: resolve('swipe')
 	);
+
 	let onSwipe = $derived(page.url.pathname === swipeHref);
 	let onAlbums = $derived(page.url.pathname.startsWith(albumsHref) && !onSwipe);
 	let onProfile = $derived(page.url.pathname.startsWith(profileHref));

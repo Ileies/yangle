@@ -1,5 +1,5 @@
 import { redirect } from '@sveltejs/kit';
-import { listAlbumsFor } from '$lib/server/albums';
+import { listAlbumsFor } from '#lib/server/albums.js';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ locals }) => {

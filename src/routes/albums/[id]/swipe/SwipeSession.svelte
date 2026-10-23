@@ -3,15 +3,15 @@
 	import { fade } from 'svelte/transition';
 	import { resolve } from '$app/paths';
 	import { ArrowLeft, RotateCw, Undo2, Upload } from '@lucide/svelte';
-	import DuplicateBracket from '$lib/components/DuplicateBracket.svelte';
-	import SwipeButtons from '$lib/components/SwipeButtons.svelte';
-	import SwipeCard from '$lib/components/SwipeCard.svelte';
-	import { DeviceOrientation } from '$lib/orientation.svelte';
-	import { PrefetchQueue } from '$lib/prefetchQueue';
-	import { yangle } from '$lib/state.svelte';
-	import { postDecisions, SwipeDeck } from '$lib/swipeDeck.svelte';
-	import { DecisionStatus } from '$lib/types';
-	import { photoUrl } from '$lib/photoUrls';
+	import DuplicateBracket from '#lib/components/DuplicateBracket.svelte';
+	import SwipeButtons from '#lib/components/SwipeButtons.svelte';
+	import SwipeCard from '#lib/components/SwipeCard.svelte';
+	import { DeviceOrientation } from '#lib/orientation.svelte.js';
+	import { PrefetchQueue } from '#lib/prefetchQueue.js';
+	import { yangle } from '#lib/state.svelte.js';
+	import { postDecisions, SwipeDeck } from '#lib/swipeDeck.svelte.js';
+	import { DecisionStatus } from '#lib/types.js';
+	import { photoUrl } from '#lib/photoUrls.js';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();

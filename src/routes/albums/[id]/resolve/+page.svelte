@@ -2,8 +2,8 @@
 	import { untrack } from 'svelte';
 	import { ArrowLeft, Check, Heart, Trash2 } from '@lucide/svelte';
 	import { resolve } from '$app/paths';
-	import { DecisionStatus } from '$lib/types';
-	import { photoUrl } from '$lib/photoUrls';
+	import { DecisionStatus } from '#lib/types.js';
+	import { photoUrl } from '#lib/photoUrls.js';
 	import type { PageData } from './$types';
 
 	let { data }: { data: PageData } = $props();

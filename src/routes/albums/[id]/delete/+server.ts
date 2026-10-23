@@ -1,6 +1,6 @@
-import { error, json } from '@sveltejs/kit';
-import { deleteAlbum, getAlbumRole } from '$lib/server/albums';
-import { AlbumRole } from '$lib/types';
+import { error } from '@sveltejs/kit';
+import { deleteAlbum, getAlbumRole } from '#lib/server/albums.js';
+import { AlbumRole } from '#lib/types.js';
 import type { RequestHandler } from './$types';
 
 export const DELETE: RequestHandler = async ({ params, locals }) => {
@@ -10,5 +10,5 @@ export const DELETE: RequestHandler = async ({ params, locals }) => {
 	if (role !== AlbumRole.Owner) error(403, 'Only the album owner can do this');
 
 	await deleteAlbum(albumId);
-	return json({ ok: true });
+	return Response.json({ ok: true });
 };

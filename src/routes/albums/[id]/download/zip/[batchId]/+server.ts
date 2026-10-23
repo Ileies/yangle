@@ -1,11 +1,11 @@
 import { error } from '@sveltejs/kit';
 import { and, eq } from 'drizzle-orm';
-import { db } from '$lib/server/db';
-import { albums, downloadBatches } from '$lib/server/db/schema';
-import { getAlbumRole } from '$lib/server/albums';
-import { parseByteRange } from '$lib/server/byteRange';
-import { storagePath } from '$lib/server/storage';
-import { DownloadBatchStatus } from '$lib/types';
+import { db } from '#lib/server/db/index.js';
+import { albums, downloadBatches } from '#lib/server/db/schema.js';
+import { getAlbumRole } from '#lib/server/albums.js';
+import { parseByteRange } from '#lib/server/byteRange.js';
+import { storagePath } from '#lib/server/storage.js';
+import { DownloadBatchStatus } from '#lib/types.js';
 import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = async ({ params, locals, request }) => {

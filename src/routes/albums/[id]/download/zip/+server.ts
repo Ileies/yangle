@@ -3,18 +3,18 @@ import { resolve } from '$app/paths';
 import { rename, unlink } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
 import { Zip, ZipPassThrough } from 'fflate';
-import { db } from '$lib/server/db';
-import { albums } from '$lib/server/db/schema';
+import { db } from '#lib/server/db/index.js';
+import { albums } from '#lib/server/db/schema.js';
 import { eq } from 'drizzle-orm';
-import { getAlbumRole } from '$lib/server/albums';
+import { getAlbumRole } from '#lib/server/albums.js';
 import {
 	completeDownloadBatch,
 	failDownloadBatch,
 	photosToDownload,
 	recordDownloadBatch
-} from '$lib/server/downloads';
-import { parseDownloadFormat, zipSourceFor } from '$lib/server/downloadFormat';
-import { storagePath } from '$lib/server/storage';
+} from '#lib/server/downloads.js';
+import { parseDownloadFormat, zipSourceFor } from '#lib/server/downloadFormat.js';
+import { storagePath } from '#lib/server/storage.js';
 import type { RequestHandler } from './$types';
 
 // Two photos can legitimately share a display name (different content hashes, same original

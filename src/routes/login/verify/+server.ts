@@ -1,7 +1,7 @@
 import { redirect } from '@sveltejs/kit';
-import { dev } from '$app/environment';
-import { consumeMagicLink } from '$lib/server/auth';
-import { SESSION_COOKIE, SESSION_TTL_MS } from '$lib/constants';
+import { dev } from '$app/env';
+import { consumeMagicLink } from '#lib/server/auth.js';
+import { SESSION_COOKIE, SESSION_TTL_MS } from '#lib/constants.js';
 import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = async ({ url, cookies }) => {

@@ -1,9 +1,13 @@
 import { db } from './db';
 import { magicLinks, sessions, users } from './db/schema';
 import { and, desc, eq, gt, isNull } from 'drizzle-orm';
-import { MAGIC_LINK_RESEND_COOLDOWN_MS, MAGIC_LINK_TTL_MS, SESSION_TTL_MS } from '$lib/constants';
-import { randomToken } from '$lib/utils';
-import type { User } from '$lib/types';
+import {
+	MAGIC_LINK_RESEND_COOLDOWN_MS,
+	MAGIC_LINK_TTL_MS,
+	SESSION_TTL_MS
+} from '#lib/constants.js';
+import { randomToken } from '#lib/utils.js';
+import type { User } from '#lib/types.js';
 
 // Returns null if a link was already requested for this email within the cooldown window,
 // so the caller can show "please wait" instead of silently resending. `redirectTo` (e.g. an

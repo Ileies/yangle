@@ -1,10 +1,10 @@
-import { error, json } from '@sveltejs/kit';
+import { error } from '@sveltejs/kit';
 import { z } from 'zod';
-import { requireAlbumAccess } from '$lib/server/albums';
-import { applyDecisions } from '$lib/server/decisions';
-import { parseJsonBody } from '$lib/server/jsonBody';
-import { getPhotosInAlbum } from '$lib/server/photos';
-import { DecisionStatus } from '$lib/types';
+import { requireAlbumAccess } from '#lib/server/albums.js';
+import { applyDecisions } from '#lib/server/decisions.js';
+import { parseJsonBody } from '#lib/server/jsonBody.js';
+import { getPhotosInAlbum } from '#lib/server/photos.js';
+import { DecisionStatus } from '#lib/types.js';
 import type { RequestHandler } from './$types';
 
 const decisionsSchema = z.array(
@@ -35,5 +35,5 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 	}
 
 	await applyDecisions(locals.user.email, inputs);
-	return json({ ok: true });
+	return Response.json({ ok: true });
 };

@@ -1,14 +1,6 @@
 import nodemailer from 'nodemailer';
-import { env } from '$env/dynamic/private';
+import { ORIGIN, SMTP_FROM, SMTP_HOST, SMTP_PASS, SMTP_PORT, SMTP_USER } from '$app/env/private';
 
-const {
-	ORIGIN,
-	SMTP_FROM = '',
-	SMTP_HOST = '',
-	SMTP_PASS = '',
-	SMTP_PORT = '587',
-	SMTP_USER = ''
-} = env;
 const appOrigin = ORIGIN || (process.env.NODE_ENV === 'development' ? 'http://localhost:5173' : '');
 if (!appOrigin) throw new Error('ORIGIN is not set');
 

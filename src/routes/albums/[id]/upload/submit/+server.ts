@@ -1,10 +1,10 @@
-import { error, json } from '@sveltejs/kit';
-import { canContribute, getAlbumRole } from '$lib/server/albums';
-import { flattenImageName, uniqueImageName } from '$lib/imageNames';
-import { clusterUploadBatch, insertPhoto, listPhotoNames } from '$lib/server/photos';
-import type { BurstCandidate } from '$lib/server/burstSimilarity';
-import { storeUpload } from '$lib/server/storage';
-import type { Photo } from '$lib/types';
+import { error } from '@sveltejs/kit';
+import { canContribute, getAlbumRole } from '#lib/server/albums.js';
+import { flattenImageName, uniqueImageName } from '#lib/imageNames.js';
+import { clusterUploadBatch, insertPhoto, listPhotoNames } from '#lib/server/photos.js';
+import type { BurstCandidate } from '#lib/server/burstSimilarity.js';
+import { storeUpload } from '#lib/server/storage.js';
+import type { Photo } from '#lib/types.js';
 import type { RequestHandler } from './$types';
 
 // Bytes only reach here for files the client's /upload/check call determined are genuinely
@@ -80,5 +80,5 @@ export const POST: RequestHandler = async ({ params, request, locals }) => {
 	}
 	await clusterUploadBatch(albumId, burstCandidates);
 
-	return json({ added, failed });
+	return Response.json({ added, failed });
 };

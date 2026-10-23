@@ -1,7 +1,7 @@
 import { error, redirect } from '@sveltejs/kit';
-import { requireAlbumAccess } from '$lib/server/albums';
-import { listConflicts } from '$lib/server/conflicts';
-import { DecisionMode } from '$lib/types';
+import { requireAlbumAccess } from '#lib/server/albums.js';
+import { listConflicts } from '#lib/server/conflicts.js';
+import { DecisionMode } from '#lib/types.js';
 import type { PageServerLoad } from './$types';
 
 export const load: PageServerLoad = async ({ params, locals }) => {
