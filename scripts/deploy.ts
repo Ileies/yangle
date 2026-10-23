@@ -69,6 +69,11 @@ async function main(): Promise<void> {
 	await remote(`test -w ${target}
 command -v bun >/dev/null
 command -v rsync >/dev/null
+bun_version=$(bun --version)
+bun_major=\${bun_version%%.*}
+bun_minor=\${bun_version#*.}
+bun_minor=\${bun_minor%%.*}
+if (( bun_major < 1 || (bun_major == 1 && bun_minor < 4) )); then echo "Bun 1.4 or newer is required (found $bun_version)." >&2; exit 1; fi
 case "$(systemctl show ${service} -p ExecStart --value)" in *' ./index.js '*) ;; *) echo 'Activate the updated NixOS configuration (bun ./index.js) before deploying.' >&2; exit 1 ;; esac
 if [[ $(id -u) != 0 ]]; then sudo -n -l systemctl stop ${service} >/dev/null; sudo -n -l systemctl restart ${service} >/dev/null; fi`);
 	const build = Bun.spawn(['bun', 'run', 'build'], {
@@ -102,8 +107,9 @@ if [[ $(id -u) != 0 ]]; then sudo -n -l systemctl stop ${service} >/dev/null; su
 	}
 	if (dryRun) {
 		await run(['rsync', ...sync, '--dry-run', '--', 'build/', dest]);
+		await run(['rsync', '-az', '--dry-run', '--', 'package.json', 'bun.lock', dest]);
 		console.log(
-			'Would stop production, download its database, migrate locally, upload and restart.'
+			'Would migrate the production database, sync the build, install dependencies and restart.'
 		);
 		return;
 	}
@@ -128,6 +134,8 @@ if [[ $(id -u) != 0 ]]; then sudo -n -l systemctl stop ${service} >/dev/null; su
 		await run(['bun', 'scripts/migrate.ts', candidate]);
 		await run([...transfer, '--', candidate, databaseLocation(`${staging}/migrated.db`)]);
 		await run(['rsync', ...sync, '--', 'build/', dest]);
+		await run(['rsync', '-az', '--', 'package.json', 'bun.lock', dest]);
+		await remote(`cd ${target} && bun install --production --frozen-lockfile`);
 		await remote(databaseCommand('install', token));
 	} catch (error) {
 		failure = error;
