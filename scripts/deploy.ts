@@ -78,7 +78,9 @@ case "$(systemctl show ${service} -p ExecStart --value)" in *' ./index.js '*) ;;
 if [[ $(id -u) != 0 ]]; then sudo -n -l systemctl stop ${service} >/dev/null; sudo -n -l systemctl restart ${service} >/dev/null; fi`);
 	const build = Bun.spawn(['bun', 'run', 'build'], {
 		cwd: project,
-		env: { ...process.env, ORIGIN: process.env.ORIGIN ?? 'https://yangle.ileies.de' },
+		// Not ORIGIN: Bun auto-loads the dev .env (ORIGIN=http://localhost:5173), and the adapter
+		// bakes this value in at build time, so every form POST would fail the CSRF origin check.
+		env: { ...process.env, ORIGIN: process.env.DEPLOY_ORIGIN ?? 'https://yangle.ileies.de' },
 		stdin: 'inherit',
 		stdout: 'inherit',
 		stderr: 'inherit'
