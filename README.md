@@ -13,7 +13,8 @@ SQLite app that keeps uploaded photos on local disk.
 
 ## Features
 
-- **Passwordless auth** — magic-link email sign-in, revocable sessions.
+- **Passwordless auth** - magic-link email sign-in with a 6-digit code alternative (for signing in
+  on a different device than the one the email is read on), revocable sessions.
 - **Albums**: create, upload (drag/pick files or a whole folder), share. HEIC/HEIF and AVIF
   decoding requires a supported macOS/Windows host; Linux uploads must use JPEG, PNG or WebP.
 - **Dedup on upload** — content-hash based, so re-uploading the same photo (even renamed) never
@@ -172,7 +173,7 @@ separate mechanisms.
 | Table                                        | Purpose                                                                                           |
 | -------------------------------------------- | ------------------------------------------------------------------------------------------------- |
 | `users`                                      | keyed by email                                                                                    |
-| `magic_links`                                | one-time login tokens, 15 min TTL                                                                 |
+| `magic_links`                                | one-time login tokens + 6-digit codes (5 guesses max), 15 min TTL                                 |
 | `sessions`                                   | revocable server-side sessions, 30 day TTL                                                        |
 | `albums`                                     | owner, name, invite link/role, `decisionMode` (independent/together), `resolveMode`               |
 | `album_shares`                               | who an album is shared with + role (`contributor` can add photos, `viewer` can only decide)       |

@@ -60,6 +60,13 @@ Bun.Image successfully; the targeted checks above remain pending.
       Bad/missing/reused token → redirects back to `/login?error=...` instead of erroring.
 - [x] Logout action — `POST /logout` (`+server.ts`): destroys the current session, clears the
       cookie, redirects to `/login`
+- [x] Sign in with a code instead of the link: each `magic_links` row also holds a 6-digit
+      `code` (emailed next to the link). The `/login` page's "sent" state has a code form
+      (`?/code` action → `consumeLoginCode(email, code)`) for signing in on a different device
+      than the one the email is open on. Only the newest live link per email is eligible, link
+      and code are consumed together (whichever is used first), and `redirectTo` is honored.
+      Brute-force guard: `code_attempts` is incremented atomically _before_ comparing, and the
+      code is dead after `LOGIN_CODE_MAX_ATTEMPTS` (5) wrong guesses.
 - [x] Rate-limit magic-link requests per email — `magic_links.createdAt` +
       `MAGIC_LINK_RESEND_COOLDOWN_MS` (1 min) check in `createMagicLink()`; returns `null` when
       a request is already in flight, which the `/login` action turns into a 429 with a
