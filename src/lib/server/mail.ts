@@ -13,21 +13,25 @@ const transporter = SMTP_HOST
 		})
 	: null;
 
-export async function sendMagicLinkEmail(email: string, token: string): Promise<void> {
+export async function sendMagicLinkEmail(
+	email: string,
+	token: string,
+	code: string
+): Promise<void> {
 	const link = `${appOrigin}/login/verify?token=${token}`;
 
 	if (!transporter) {
-		// No SMTP configured (local dev) - print the link instead of sending it.
-		console.log(`[mail] magic link for ${email}: ${link}`);
+		// No SMTP configured (local dev) - print the link and code instead of sending them.
+		console.log(`[mail] magic link for ${email}: ${link} (code: ${code})`);
 		return;
 	}
 
 	await transporter.sendMail({
 		from: SMTP_FROM,
 		to: email,
-		subject: 'Your Yangle login link',
-		text: `Sign in to Yangle: ${link}\n\nThis link expires in 15 minutes.`,
-		html: `<p><a href="${link}">Sign in to Yangle</a></p><p>This link expires in 15 minutes.</p>`
+		subject: `Your Yangle login code: ${code}`,
+		text: `Sign in to Yangle: ${link}\n\nOr, on another device, enter this code: ${code}\n\nThe link and code expire in 15 minutes and work once.`,
+		html: `<p><a href="${link}">Sign in to Yangle</a></p><p>Or, on another device, enter this code:</p><p style="font-size:2em;font-weight:bold;letter-spacing:0.2em;font-family:monospace">${code}</p><p>The link and code expire in 15 minutes and work once.</p>`
 	});
 }
 
