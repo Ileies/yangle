@@ -43,6 +43,13 @@
 			"when": 1787924141493,
 			"tag": "0005_reset_legacy_duplicate_groups",
 			"breakpoints": true
+		},
+		{
+			"idx": 6,
+			"version": "6",
+			"when": 1793532251658,
+			"tag": "0006_dizzy_magdalene",
+			"breakpoints": true
 		}
 	]
 }

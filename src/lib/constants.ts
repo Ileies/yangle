@@ -1,6 +1,8 @@
 // Auth
 export const MAGIC_LINK_TTL_MS = 15 * 60 * 1000; // 15 minutes
 export const MAGIC_LINK_RESEND_COOLDOWN_MS = 60 * 1000; // 1 minute between requests per email
+export const LOGIN_CODE_LENGTH = 6;
+export const LOGIN_CODE_MAX_ATTEMPTS = 5; // wrong guesses before a link's code stops working
 export const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 export const SESSION_COOKIE = 'session';
 

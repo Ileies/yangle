@@ -14,10 +14,17 @@ export const users = sqliteTable('users', {
 	createdAt: integer('created_at').notNull()
 });
 
-// One-time login links, emailed to the user. Consumed on first visit, then dead.
+// One-time login links, emailed to the user. Consumed on first visit, then dead. Each link
+// also carries a short numeric `code` for signing in on a device other than the one the email
+// was opened on; the code is consumed together with the link, whichever is used first.
 export const magicLinks = sqliteTable('magic_links', {
 	token: text('token').notNull().primaryKey(),
 	email: text('email').notNull(),
+	// Null only on rows created before codes existed.
+	code: text('code'),
+	// Wrong code guesses against this link. A 6-digit code is brute-forceable, so the link is
+	// dead for code entry once this hits `LOGIN_CODE_MAX_ATTEMPTS`.
+	codeAttempts: integer('code_attempts').notNull().default(0),
 	createdAt: integer('created_at').notNull(),
 	expiresAt: integer('expires_at').notNull(),
 	consumedAt: integer('consumed_at'),
