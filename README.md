@@ -25,7 +25,7 @@ SQLite app that keeps uploaded photos on local disk.
   resolved via a single-elimination bracket before they reach the swipe deck.
 - **The swipe deck** — full-screen, gesture-driven keep/delete/favorite triage with pinch-zoom,
   prefetching, orientation handling, in-deck undo, and a durable review list for changing your
-  mind later. See `TODO.md` §3 for the full design rationale.
+  mind later. See [How it works](#how-it-works) for the design.
 - **Sharing** — invite by email or shareable link, `contributor` (can upload) vs. `viewer`
   (can only decide) roles, independent or joint (`together`) decision modes. In `together` mode,
   everyone swipes independently and a resolve screen surfaces only the photos where decisions
@@ -43,7 +43,9 @@ SQLite app that keeps uploaded photos on local disk.
 - **`Bun.Image`** for thumbnails, previews and JPEG compatibility renditions on supported hosts;
   **`pngjs`** reads the small generated PNGs used for duplicate fingerprints (pure JavaScript).
   **`fflate`** handles streamed ZIP downloads.
-- No test runner yet — see `TODO.md`
+- `bun test` for unit tests of pure logic; no route, database or gesture tests yet, see `TODO.md`
+- Installable PWA (`static/manifest.webmanifest` + icons). No offline support: the app is
+  inherently server-backed, only the installability layer is provided.
 
 ## Getting started
 
@@ -162,6 +164,184 @@ Also: `vite dev`/`vite build` must run as `bun --bun vite dev` (already wired in
 Node's ESM loader, which doesn't understand the `bun:sqlite` import scheme used by
 `drizzle-orm/bun-sqlite`. Production also runs on Bun via `bun run start`.
 
+## How it works
+
+### Auth
+
+- `magic_links` + `sessions` tables, helpers in `server/auth.ts`; `hooks.server.ts` fills
+  `event.locals.user` from the `session` cookie (httpOnly, `sameSite: lax`, `secure` outside dev).
+- `/login` takes an email, creates a link and sends it via `mail.ts` (logged to the console when
+  SMTP is unconfigured). A bad, missing or reused token redirects to `/login?error=...`.
+- Each link row also holds a 6-digit `code`, emailed next to the link, for signing in on another
+  device. Only the newest live link per email is eligible and link and code are consumed
+  together. `code_attempts` is incremented atomically _before_ comparing and the code dies after
+  5 wrong guesses.
+- Requests per email are rate-limited (1 minute cooldown, answered with a 429).
+- `redirectTo` (same-origin paths only) round-trips through a `magic_links` column, so e.g.
+  `/invite/[token]` can send a visitor through sign-in and back.
+- `POST /logout` ends the current session. `/profile` edits the display name, lists owned and
+  shared albums, and offers "log out everywhere" (`destroyAllSessions()`).
+
+### Albums and upload
+
+- `/` redirects to `/albums` or `/login`. `/albums` lists owned and shared albums,
+  `/albums/new` creates one (name only; decision mode is changed later in settings).
+- **Upload** (`/albums/[id]/upload`): the client computes a `sha256Hex()` per file (same helper
+  on client and server), POSTs the hashes to `/upload/check` and only sends bytes the server
+  doesn't know yet. `storeUpload()` writes the original, a ~1600px WebP preview and a ~320px WebP
+  thumbnail, and computes the content hash (exact dedup) and dHash (near-duplicate clustering).
+  Request bodies and file fields are validated; malformed input returns a clean 400.
+- **Name conflicts**: the same content under a different name prompts which name to keep
+  (`/upload/resolve`), the other lands in `photo_name_variants`.
+- **Permissions**: `canContribute(getAlbumRole(...))` guards both upload endpoints and the
+  "Upload" button.
+- **HEIC/HEIF input**: decodable only on supported macOS/Windows hosts; Linux returns a per-file
+  error asking for JPEG or PNG. Supported hosts also produce a quality-92 JPEG compatibility
+  rendition next to the preserved original. Previously stored originals and renditions stay
+  downloadable everywhere.
+- **Photo serving** (`/photos/[id]/[size]`): auth-gated streaming of thumbnail/preview/original/
+  compat with a per-request album membership check (files live outside `static/`).
+  `Cache-Control: private, max-age=31536000, immutable`, since the bytes for a content hash never
+  change.
+
+### The swipe deck
+
+The make-or-break screen; everything else feeds photos into it. The acceptance bar:
+
+1. Zoom and swipe are never confused (no phantom swipe while pinching, no stuck panning).
+2. The current card is interactive the instant the deck opens or advances (no spinner on a
+   cached photo).
+3. Rotating the phone with the OS rotation lock on changes nothing in the UI.
+4. A burst of 20 near-identical shots takes one bracket pass, not 20 judgment calls.
+5. Every decision is revisable: nothing here is more permanent than an UPDATE to one `decisions`
+   row.
+
+**Data flow.** `albums/[id]/swipe/+page.server.ts` ships the user's undecided photos (excluding
+those in unresolved duplicate clusters) ordered by `uploadedAt`, as lean `DeckPhoto` payloads.
+`swipeDeck.svelte.ts` holds the session state: `queue` (`queue[0]` is the current card, swiped
+cards are spliced out) and a 20-entry `history` undo stack. Decisions are optimistic: the card
+leaves immediately and `POST /albums/[id]/decisions` fires afterwards as a batch (coalesced every
+~400ms or 5 decisions), with retry and a non-blocking toast on final failure. Reopening the deck
+resumes where you left off, since `load` filters to undecided photos. The queue is a snapshot:
+photos added by others appear on the next open (live updates belong with the SSE work in
+`TODO.md`).
+
+**Components.** `+page.svelte` (owns the deck state, renders `queue[0]` plus 1-2 cards stacked
+behind), `SwipeCard` (gestures, zoom/pan, exit animation), `SwipeButtons` (same decision path as
+gestures), `DuplicateBracket`, and `prefetchQueue.ts` (sequencing logic, independent of any
+component).
+
+**Gestures.** `@use-gesture/vanilla` behind a `use:gesture` action, with an explicit state machine
+(`idle | swiping | panning | pinching` plus scale):
+
+- One finger at `scale === 1` starts `swiping`; the direction (horizontal = delete/keep, up =
+  favorite) locks after the first ~10px. At `scale > 1` it starts `panning`; swipe-dismiss only
+  re-arms once scale is exactly 1. Mode is gated on scale, not heuristics.
+- Two fingers always win and cancel any swipe in progress (like iOS Photos).
+- Double-tap zooms to ~2.5x at the tap point, and out to 1x with the same spring as a
+  pinch released out of bounds.
+- Dismissal uses `distance > SWIPE_DISMISS_PX || velocity > SWIPE_DISMISS_VELOCITY`; the card
+  tilts proportionally to drag distance. Thresholds live in `constants.ts`.
+- Zoom model: a single `translate3d(...) scale(...)` on the image (GPU layer, never animating
+  width/height/top/left), pinch anchored at the finger midpoint, pan clamped to image bounds with
+  rubber-band and spring-back, scale clamped to 1-4 with the same treatment. `touch-action: none`
+  on the image, because the gesture library owns all touch interpretation.
+
+**Favorite** is a third exit direction: drag up toward a heart at top-center (it scales and glows
+on approach), or tap the heart. `favorite` is its own enum value, not `keep` plus a flag, so the
+review grid can filter by it. The card shrinks toward the heart on exit.
+
+**Latency (server in Germany, viewers possibly in China).** Three image sizes (thumbnail, preview,
+original; originals only at ZIP time). `prefetchQueue.ts` decodes the focused card first, then
+warms `PREFETCH_AHEAD_COUNT` (4) upcoming previews with `fetchPriority: 'low'`, at most 2
+concurrent. A DPR check avoids fetching 3x pixels on 1x displays. The cached thumbnail, blurred
+via CSS, serves as the blur-up placeholder until the preview decodes. A failed preview shows a
+retry affordance. A CDN/reverse-proxy cache in front of the origin is the biggest remaining lever
+for the transpacific route, but an infra decision outside this repo.
+
+**Orientation.** `orientation.svelte.ts` listens to `screen.orientation`'s `change` event
+(fallback: `matchMedia`), which only fires on a genuine layout change and therefore respects the
+OS rotation lock (accelerometer-based `deviceorientation` was ruled out for that reason). The
+`allowLandscapeRotation` toggle (deck settings, `localStorage`) selects between portrait layout
+with rotating button glyphs (default, camera-app style) and a full landscape layout with
+re-anchored buttons.
+
+**Undo.** A persistent bottom-corner affordance, not shake-to-undo (too easy to trigger by
+accident), with a one-line reminder ("Undo: deleted IMG_042.jpg"). It pops the last `history`
+entry, re-inserts the photo at `queue[0]` and writes the reverted status through the same batched
+endpoint.
+
+**Progress and end states.** `{decided} / {total}` with a thin bar; a dedicated "nothing to swipe"
+state (link to upload for contributors, else review) when the deck opens empty; an end-of-deck
+summary (kept/favorited/deleted) linking to review and the album.
+
+**Accessibility.** Keyboard: `←` delete, `→` keep, `↑` favorite, `⌘/Ctrl+Z` undo, through the same
+decision path as gestures. `SwipeButtons` are real `<button>`s with `aria-label`s, card images get
+`alt={displayName}`, and `prefers-reduced-motion` reduces fly-out/spring/rotation to an opacity
+cross-fade.
+
+### Near-duplicate (burst) resolution
+
+Plain swiping is poor for 20 near-identical shots (each feels like a "keep"), so clusters are
+resolved before reaching the deck.
+
+- **Clustering** is scoped to the photos of one upload request, so an old album photo is never
+  reopened by a later scene with a similar layout. EXIF capture time (when both exist),
+  orientation and aspect ratio gate candidates; dHash is a cheap prefilter; windowed SSIM over
+  normalized luminance and a colour-histogram intersection must both pass. Complete-link
+  clustering requires every pair to match, preventing `A ≈ B ≈ C` bridge chains. O(n²) within one
+  upload, fine at the intended sizes.
+- **Bracket**: a cluster of N becomes a single-elimination bracket computed client-side, with no
+  new table: its state is derivable from which photos still have `duplicateResolved: false`, so a
+  reload recomputes the same bracket. Odd sizes get one bye per round; rounds greedily pair the
+  closest dHash fingerprints.
+- **UI** (`DuplicateBracket.svelte`): a split-screen with a draggable divider (drag toward the
+  photo to discard; tap on either half also works). Losers get a `delete` decision immediately
+  via the normal decisions path (revisable later), the last survivor gets
+  `duplicateResolved: true`. Progress spans the phase ("Round 2 of 3 · burst 4 of 7"), and
+  "keep both" is supported.
+- **Handoff**: resolved survivors and "keep both" pairs are appended to the live deck queue
+  without a reload.
+
+### Decisions and the review list
+
+Swiping upserts the `decisions` row for `(photoId, currentUser)`; the batched deck writes and
+in-deck undo are both callers of that one upsert. `/albums/[id]/review` groups all photos by
+current decision (deleted / kept / favorited / undecided) and lets any decision, including
+bracket losers, be flipped after the fact. This is the durable, cross-session undo; in-deck undo
+is a same-session convenience on top.
+
+### Sharing and permissions
+
+- Invite by email (`album_shares` row; unknown addresses get a placeholder `users` row) or by
+  shareable link (`/invite/[token]`). Roles: `contributor` (add photos) and `viewer` (decide only).
+- `/albums/[id]/settings` (owner only): shares list, email invite, invite link, decision-mode
+  radio, delete-album danger zone. Deleting an album cascades through the FKs and also removes its
+  files under `storage/`. Revoking a share leaves that user's `decisions` alone so access can be
+  re-granted without losing their swipes.
+- `independent` mode: everyone has their own `decisions` rows, no coordination.
+- `together` mode with `swipe-all-then-resolve`: everyone swipes independently, then
+  `/albums/[id]/resolve` (`server/conflicts.ts#listConflicts`) shows only photos where every
+  participant has a real decision and they don't all agree. One pick overwrites every
+  participant's row (`applyDecisionToAll`), which removes it from the conflict list.
+- API endpoints live under dedicated subpaths (`shares/`, `invite-link/`, `decision-mode/`,
+  `delete/`, `resolve/apply/`), never beside a page (see the route-collision gotcha below).
+
+### Downloads
+
+- `/albums/[id]/download` lists the user's kept/favorited photos (deleted ones are excluded) with
+  per-photo badges (already downloaded / new since last download / not yet decided). The user
+  picks `?format=original|compatible` when a HEIC compatibility rendition exists.
+- `/download/zip` builds a ZIP with `fflate` (pure JS, no native binary), writing chunks to a temp
+  file under `storage/zips`, renaming it into place and redirecting to the stable
+  `/download/zip/[batchId]`. That route supports `HEAD`, `Range` and `If-Range` with a known
+  `Content-Length` and `ETag`, so interrupted downloads resume, and checks album membership and
+  batch ownership. Originals are read from disk one at a time.
+- `download_batches` goes `pending` → `ready`; on ready, `photo_downloads` is marked for each
+  photo × user. This does not confirm the client received every byte. Re-downloading is always
+  allowed ("new" is a badge, not a filter).
+- Duplicate display names within one ZIP get the photo id appended before the extension.
+
 ## Data model
 
 The core design decision: nothing is ever deleted from the database when a user "deletes" a
@@ -213,7 +393,7 @@ src/
       downloads.ts               — ZIP download batches + per-photo download tracking
   routes/                — SvelteKit routes (pages + API endpoints)
   hooks.server.ts        — reads session cookie → `event.locals.user`
-storage/                 - gitignored data directory (local.db, originals/previews/thumbnails/zips)
+storage/ (or DATA_DIR)   - data directory (local.db, originals/previews/thumbnails/zips); `data/` is gitignored
 drizzle/                 — generated SQL migrations
 ```
 
@@ -229,8 +409,11 @@ page in the same directory (API endpoints live in a dedicated subpath, e.g.
 The core interaction (binary keep-or-delete decision) is a yin-yang metaphor, so a couple of
 deliberate visual nods reinforce it without turning the UI kitschy: the near-duplicate
 resolution screen's split-screen divider is a curved S-line (literally the yin-yang boundary
-shape), not a straight one. Deliberately kept to just this one spot for the MVP.
+shape), not a straight one; its midpoint follows the drag and its control points scale with the
+drag offset instead of flattening at the extremes. Deliberately kept to just this one spot for the
+MVP: no yin-yang imagery in navigation, icons or the logo, which is a branding decision for later.
 
 ## Status / roadmap
 
-See `TODO.md` for what's built, what's left, and the reasoning behind non-obvious decisions.
+All planned MVP features are built. `TODO.md` lists what is still open (device testing, platform
+gaps, deferred scope).
